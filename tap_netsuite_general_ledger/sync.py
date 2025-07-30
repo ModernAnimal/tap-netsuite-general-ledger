@@ -3,7 +3,7 @@ Sync functionality for NetSuite GL Detail tap
 """
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any
 from decimal import InvalidOperation
 
@@ -132,11 +132,6 @@ def get_sync_params(config: Dict[str, Any]) -> Dict[str, Any]:
     elif config.get('period_name'):
         params['period_name'] = config['period_name']
 
-    if config.get('date_from'):
-        params['date_from'] = config['date_from']
-    if config.get('date_to'):
-        params['date_to'] = config['date_to']
-
     return params
 
 
@@ -205,17 +200,13 @@ def sync_stream(
 
     # Update state with completion time and date range
     sync_date_range = ""
-    if sync_params.get('date_from') and sync_params.get('date_to'):
-        date_from = sync_params['date_from']
-        date_to = sync_params['date_to']
-        sync_date_range = f" (date range: {date_from} to {date_to})"
-    elif sync_params.get('period_name'):
+    if sync_params.get('period_name'):
         sync_date_range = f" (period: {sync_params['period_name']})"
     elif sync_params.get('period_id'):
         sync_date_range = f" (period ID: {sync_params['period_id']})"
 
     state[stream_name] = {
-        'last_sync': datetime.utcnow().isoformat(),
+        'last_sync': datetime.now(timezone.utc).isoformat(),
         'record_count': record_count,
         'replication_method': 'FULL_TABLE',
         'sync_parameters': sync_params,

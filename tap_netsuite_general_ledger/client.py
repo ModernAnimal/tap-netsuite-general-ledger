@@ -108,9 +108,7 @@ class NetSuiteClient:
     async def fetch_gl_data(
         self,
         period_id: Optional[str] = None,
-        period_name: Optional[str] = None,
-        date_from: Optional[str] = None,
-        date_to: Optional[str] = None
+        period_name: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Fetch GL detail data from NetSuite"""
 
@@ -128,11 +126,6 @@ class NetSuiteClient:
             request_data['periodId'] = period_id
         elif period_name:
             request_data['periodName'] = period_name
-
-        if date_from:
-            request_data['dateFrom'] = date_from
-        if date_to:
-            request_data['dateTo'] = date_to
 
         # Build request URL
         url = f"{self.base_url}?script={self.script_id}&deploy={self.deploy_id}"

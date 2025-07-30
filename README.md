@@ -43,11 +43,8 @@ The tap requires the following configuration parameters:
 - `netsuite_script_id`: RESTlet script ID
 - `netsuite_deploy_id`: RESTlet deployment ID
 - `netsuite_search_id`: Saved search ID
-- `start_date`: Start date for data extraction (ISO format)
 - `period_id`: Specific period ID to extract
 - `period_name`: Specific period name to extract (e.g., "Jan 2024")
-- `date_from`: Start date filter (MM/DD/YYYY format)
-- `date_to`: End date filter (MM/DD/YYYY format)
 
 **Note**: See `example_rolling_window_config.json` for a complete configuration template with rolling window examples.
 
@@ -63,8 +60,7 @@ The tap requires the following configuration parameters:
   "netsuite_script_id": "your_script_id",
   "netsuite_deploy_id": "your_deploy_id",
   "netsuite_search_id": "your_search_id",
-  "date_from": "01/01/2024",
-  "date_to": "01/31/2024"
+  "period_name": "Jan 2024"
 }
 ```
 
@@ -74,15 +70,6 @@ The tap requires the following configuration parameters:
 ```json
 {
   "period_name": "Jan 2024",
-  ...other config...
-}
-```
-
-**Specific date range refresh:**
-```json
-{
-  "date_from": "01/01/2024",
-  "date_to": "01/31/2024",
   ...other config...
 }
 ```
@@ -192,7 +179,7 @@ This tap is specifically designed for **FULL REFRESH** replication to ensure dat
 
 ### Best Practices
 
-- Use specific date ranges (`date_from`/`date_to`) or periods (`period_name`/`period_id`)
+- Use specific periods (`period_name`/`period_id`) for time-based filtering
 - Run separate syncs for different time periods to maintain granular control
 - Monitor sync duration for large date ranges
 - Consider target system's truncate/load performance characteristics
