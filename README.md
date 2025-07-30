@@ -60,9 +60,9 @@ The tap requires the following configuration parameters:
   "netsuite_consumer_secret": "your_consumer_secret",
   "netsuite_token_id": "your_token_id",
   "netsuite_token_secret": "your_token_secret",
-  "netsuite_script_id": "1859",
-  "netsuite_deploy_id": "2",
-  "netsuite_search_id": "customsearch_gl_detail_report_2_7_3",
+  "netsuite_script_id": "your_script_id",
+  "netsuite_deploy_id": "your_deploy_id",
+  "netsuite_search_id": "your_search_id",
   "date_from": "01/01/2024",
   "date_to": "01/31/2024"
 }
