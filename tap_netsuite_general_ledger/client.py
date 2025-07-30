@@ -115,19 +115,19 @@ class NetSuiteClient:
         period_names: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
         """Fetch GL detail data from NetSuite
-        
+
         Args:
             period_ids: List of period IDs to fetch
             period_names: List of period names to fetch
         """
-        
+
         # Validate that we have at least one period specified
         if not period_ids and not period_names:
             LOGGER.warning("No period specified, fetching all data")
-        
+
         # If we have multiple periods, fetch them in batches and combine
         all_records = []
-        
+
         if period_ids:
             for pid in period_ids:
                 records = await self._fetch_single_period(period_id=pid)
@@ -145,7 +145,7 @@ class NetSuiteClient:
         else:
             # No period specified, fetch all
             all_records = await self._fetch_single_period()
-        
+
         total_count = len(all_records)
         LOGGER.info(
             f"Total records retrieved across all periods: {total_count}"
@@ -179,6 +179,9 @@ class NetSuiteClient:
                f"&deploy={self.deploy_id}")
 
         LOGGER.info(f"Fetching GL data with filters: {request_data}")
+        LOGGER.info(f"Making request to URL: {url}")
+        LOGGER.info(f"Request headers: {dict(headers)}")
+        LOGGER.info(f"Request payload: {request_data}")
 
         # Make request with timeout
         timeout = aiohttp.ClientTimeout(total=600)  # 10 minutes
@@ -191,6 +194,7 @@ class NetSuiteClient:
                 ) as response:
                     if response.status == 200:
                         result = await response.json()
+                        LOGGER.info(f"NetSuite API response: {result}")
                         if result.get('success') and 'results' in result:
                             records = result['results']
                             LOGGER.info(
