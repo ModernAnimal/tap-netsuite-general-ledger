@@ -1,0 +1,111 @@
+{
+  "type": "object",
+  "properties": {
+    "internal_id": {
+      "type": ["null", "string"],
+      "description": "Internal ID of the transaction"
+    },
+    "document_number": {
+      "type": ["null", "string"],
+      "description": "Document number"
+    },
+    "type": {
+      "type": ["null", "string"],
+      "description": "Transaction type"
+    },
+    "journal_name": {
+      "type": ["null", "string"],
+      "description": "Journal name"
+    },
+    "date": {
+      "type": ["null", "string"],
+      "format": "date-time",
+      "description": "Transaction date"
+    },
+    "period": {
+      "type": ["null", "string"],
+      "description": "Posting period"
+    },
+    "subsidiary": {
+      "type": ["null", "string"],
+      "description": "Subsidiary"
+    },
+    "account": {
+      "type": ["null", "string"],
+      "description": "Account"
+    },
+    "amount_debit": {
+      "type": ["null", "number"],
+      "description": "Debit amount"
+    },
+    "amount_credit": {
+      "type": ["null", "number"],
+      "description": "Credit amount"
+    },
+    "amount_net": {
+      "type": ["null", "number"],
+      "description": "Net amount"
+    },
+    "amount_transaction_total": {
+      "type": ["null", "number"],
+      "description": "Transaction total amount"
+    },
+    "class": {
+      "type": ["null", "string"],
+      "description": "Class"
+    },
+    "location": {
+      "type": ["null", "string"],
+      "description": "Location"
+    },
+    "department": {
+      "type": ["null", "string"],
+      "description": "Department"
+    },
+    "line": {
+      "type": ["null", "string"],
+      "description": "Line number"
+    },
+    "name_line": {
+      "type": ["null", "string"],
+      "description": "Name (Line)"
+    },
+    "memo_main": {
+      "type": ["null", "string"],
+      "description": "Main memo"
+    },
+    "memo_line": {
+      "type": ["null", "string"],
+      "description": "Line memo"
+    },
+    "status": {
+      "type": ["null", "string"],
+      "description": "Status"
+    },
+    "approval_status": {
+      "type": ["null", "string"],
+      "description": "Approval status"
+    },
+    "date_created": {
+      "type": ["null", "string"],
+      "format": "date-time",
+      "description": "Date created"
+    },
+    "created_by": {
+      "type": ["null", "string"],
+      "description": "Created by"
+    },
+    "name": {
+      "type": ["null", "string"],
+      "description": "Name"
+    },
+    "posting": {
+      "type": ["null", "string"],
+      "description": "Posting"
+    },
+    "company_name": {
+      "type": ["null", "string"],
+      "description": "Company name"
+    }
+  }
+}
