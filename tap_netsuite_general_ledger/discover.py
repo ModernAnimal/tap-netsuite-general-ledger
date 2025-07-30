@@ -145,7 +145,7 @@ def discover_streams(config: Dict[str, Any]) -> Catalog:
         tap_stream_id="netsuite_general_ledger_detail",
         stream="netsuite_general_ledger_detail",
         schema=gl_detail_schema,
-        key_properties=["internal_id"],
+        key_properties=[],
         metadata=gl_detail_metadata
     )
 
