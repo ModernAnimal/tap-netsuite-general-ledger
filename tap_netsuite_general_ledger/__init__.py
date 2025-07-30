@@ -31,8 +31,8 @@ OPTIONAL_CONFIG_KEYS = [
     "netsuite_script_id",
     "netsuite_deploy_id",
     "netsuite_search_id",
-    "period_id",
-    "period_name"
+    "period_ids",
+    "period_names"
 ]
 
 

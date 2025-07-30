@@ -38,7 +38,10 @@ class NetSuiteClient:
         self.search_id = config.get("netsuite_search_id")
 
         # Build base URL
-        self.base_url = f"https://{self.account}.restlets.api.netsuite.com/app/site/hosting/restlet.nl"
+        self.base_url = (
+            f"https://{self.account}.restlets.api.netsuite.com"
+            f"/app/site/hosting/restlet.nl"
+        )
 
         LOGGER.info(f"Initialized NetSuite client for account: {self.account}")
 
@@ -76,7 +79,8 @@ class NetSuiteClient:
 
         # Build signature base string
         signature_base = (
-            f"POST&{quote(self.base_url, safe='')}&{quote(param_string, safe='')}"
+            f"POST&{quote(self.base_url, safe='')}"
+            f"&{quote(param_string, safe='')}"
         )
 
         # Create signing key
@@ -107,10 +111,53 @@ class NetSuiteClient:
 
     async def fetch_gl_data(
         self,
+        period_ids: Optional[List[str]] = None,
+        period_names: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
+        """Fetch GL detail data from NetSuite
+        
+        Args:
+            period_ids: List of period IDs to fetch
+            period_names: List of period names to fetch
+        """
+        
+        # Validate that we have at least one period specified
+        if not period_ids and not period_names:
+            LOGGER.warning("No period specified, fetching all data")
+        
+        # If we have multiple periods, fetch them in batches and combine
+        all_records = []
+        
+        if period_ids:
+            for pid in period_ids:
+                records = await self._fetch_single_period(period_id=pid)
+                all_records.extend(records)
+                LOGGER.info(
+                    f"Fetched {len(records)} records for period ID: {pid}"
+                )
+        elif period_names:
+            for pname in period_names:
+                records = await self._fetch_single_period(period_name=pname)
+                all_records.extend(records)
+                LOGGER.info(
+                    f"Fetched {len(records)} records for period name: {pname}"
+                )
+        else:
+            # No period specified, fetch all
+            all_records = await self._fetch_single_period()
+        
+        total_count = len(all_records)
+        LOGGER.info(
+            f"Total records retrieved across all periods: {total_count}"
+        )
+        return all_records
+
+    async def _fetch_single_period(
+        self,
         period_id: Optional[str] = None,
         period_name: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """Fetch GL detail data from NetSuite"""
+        """Fetch GL detail data for a single period from NetSuite"""
 
         # Prepare request headers
         headers = {
@@ -128,7 +175,8 @@ class NetSuiteClient:
             request_data['periodName'] = period_name
 
         # Build request URL
-        url = f"{self.base_url}?script={self.script_id}&deploy={self.deploy_id}"
+        url = (f"{self.base_url}?script={self.script_id}"
+               f"&deploy={self.deploy_id}")
 
         LOGGER.info(f"Fetching GL data with filters: {request_data}")
 
@@ -146,7 +194,8 @@ class NetSuiteClient:
                         if result.get('success') and 'results' in result:
                             records = result['results']
                             LOGGER.info(
-                                f"Successfully retrieved {len(records)} records"
+                                f"Successfully retrieved {len(records)} "
+                                f"records"
                             )
                             return records
                         else:
@@ -156,7 +205,9 @@ class NetSuiteClient:
                     else:
                         error_text = await response.text()
                         LOGGER.error(f"HTTP {response.status}: {error_text}")
-                        raise Exception(f"HTTP {response.status}: {error_text}")
+                        raise Exception(
+                            f"HTTP {response.status}: {error_text}"
+                        )
             except asyncio.TimeoutError:
                 LOGGER.error("Request timed out after 10 minutes")
                 raise Exception("Request timed out")
@@ -164,7 +215,9 @@ class NetSuiteClient:
                 LOGGER.error(f"Request failed: {str(e)}")
                 raise
 
-    def extract_field_value(self, record: Dict[str, Any], field_name: str) -> str:
+    def extract_field_value(
+        self, record: Dict[str, Any], field_name: str
+    ) -> str:
         """Extract field value from NetSuite record structure"""
         if 'values' not in record:
             return ''

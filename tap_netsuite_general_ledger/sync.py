@@ -97,7 +97,9 @@ def format_date(date_str: str) -> str:
         return date_str
 
 
-def transform_record(record: Dict[str, Any], client: NetSuiteClient) -> Dict[str, Any]:
+def transform_record(
+    record: Dict[str, Any], client: NetSuiteClient
+) -> Dict[str, Any]:
     """Transform NetSuite record to our schema format"""
     transformed = {}
 
@@ -113,7 +115,11 @@ def transform_record(record: Dict[str, Any], client: NetSuiteClient) -> Dict[str
         raw_value = client.extract_field_value(record, netsuite_field)
 
         # Apply type-specific transformations
-        if schema_field in ['amount_debit', 'amount_credit', 'amount_net', 'amount_transaction_total']:
+        amount_fields = [
+            'amount_debit', 'amount_credit', 'amount_net',
+            'amount_transaction_total'
+        ]
+        if schema_field in amount_fields:
             transformed[schema_field] = convert_to_number(raw_value)
         elif schema_field in ['date', 'date_created']:
             transformed[schema_field] = format_date(raw_value)
@@ -127,10 +133,27 @@ def get_sync_params(config: Dict[str, Any]) -> Dict[str, Any]:
     """Extract sync parameters from config"""
     params = {}
 
-    if config.get('period_id'):
-        params['period_id'] = config['period_id']
+    # Handle period_ids (convert single values to lists for compatibility)
+    if config.get('period_ids'):
+        period_ids = config['period_ids']
+        if isinstance(period_ids, list):
+            params['period_ids'] = period_ids
+        else:
+            params['period_ids'] = [period_ids]
+    elif config.get('period_id'):
+        # Legacy support: convert single period_id to list
+        params['period_ids'] = [config['period_id']]
+
+    # Handle period_names (convert single values to lists for compatibility)
+    elif config.get('period_names'):
+        period_names = config['period_names']
+        if isinstance(period_names, list):
+            params['period_names'] = period_names
+        else:
+            params['period_names'] = [period_names]
     elif config.get('period_name'):
-        params['period_name'] = config['period_name']
+        # Legacy support: convert single period_name to list
+        params['period_names'] = [config['period_name']]
 
     return params
 
@@ -147,7 +170,9 @@ def sync_stream(
     LOGGER.info(f"Starting full refresh sync for stream: {stream_name}")
 
     # Write schema
-    singer.write_schema(stream_name, stream.schema.to_dict(), stream.key_properties)
+    singer.write_schema(
+        stream_name, stream.schema.to_dict(), stream.key_properties
+    )
 
     # Get sync parameters
     sync_params = get_sync_params(config)
@@ -200,10 +225,18 @@ def sync_stream(
 
     # Update state with completion time and date range
     sync_date_range = ""
-    if sync_params.get('period_name'):
-        sync_date_range = f" (period: {sync_params['period_name']})"
-    elif sync_params.get('period_id'):
-        sync_date_range = f" (period ID: {sync_params['period_id']})"
+    if sync_params.get('period_names'):
+        periods = sync_params['period_names']
+        if len(periods) == 1:
+            sync_date_range = f" (period: {periods[0]})"
+        else:
+            sync_date_range = f" (periods: {', '.join(periods)})"
+    elif sync_params.get('period_ids'):
+        period_ids = sync_params['period_ids']
+        if len(period_ids) == 1:
+            sync_date_range = f" (period ID: {period_ids[0]})"
+        else:
+            sync_date_range = f" (period IDs: {', '.join(period_ids)})"
 
     state[stream_name] = {
         'last_sync': datetime.now(timezone.utc).isoformat(),
