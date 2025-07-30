@@ -40,9 +40,9 @@ The tap requires the following configuration parameters:
 
 ### Optional Configuration
 
-- `netsuite_script_id`: RESTlet script ID (default: "1859")
-- `netsuite_deploy_id`: RESTlet deployment ID (default: "2")
-- `netsuite_search_id`: Saved search ID (default: "customsearch_gl_detail_report_2_7_3")
+- `netsuite_script_id`: RESTlet script ID
+- `netsuite_deploy_id`: RESTlet deployment ID
+- `netsuite_search_id`: Saved search ID
 - `start_date`: Start date for data extraction (ISO format)
 - `period_id`: Specific period ID to extract
 - `period_name`: Specific period name to extract (e.g., "Jan 2024")
