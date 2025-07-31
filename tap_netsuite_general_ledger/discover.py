@@ -6,7 +6,6 @@ import json
 import os
 from typing import Dict, Any
 
-import singer
 from singer import Schema, CatalogEntry, Catalog
 
 
@@ -76,10 +75,6 @@ def get_gl_detail_schema() -> Dict[str, Any]:
                 "type": ["null", "string"],
                 "description": "Department"
             },
-            "line": {
-                "type": ["null", "string"],
-                "description": "Line number"
-            },
             "name_line": {
                 "type": ["null", "string"],
                 "description": "Line name"
@@ -120,6 +115,10 @@ def get_gl_detail_schema() -> Dict[str, Any]:
             "company_name": {
                 "type": ["null", "string"],
                 "description": "Company name"
+            },
+            "transaction_line_id": {
+                "type": ["null", "string"],
+                "description": "Transaction line ID"
             }
         }
     }
@@ -145,7 +144,7 @@ def discover_streams(config: Dict[str, Any]) -> Catalog:
         tap_stream_id="netsuite_general_ledger_detail",
         stream="netsuite_general_ledger_detail",
         schema=gl_detail_schema,
-        key_properties=["internal_id"],
+        key_properties=["internal_id", "transaction_line_id"],
         metadata=gl_detail_metadata
     )
 
@@ -158,7 +157,9 @@ def save_schema_to_file() -> None:
     schema_dir = os.path.join(os.path.dirname(__file__), "schemas")
     os.makedirs(schema_dir, exist_ok=True)
 
-    schema_file = os.path.join(schema_dir, "netsuite_general_ledger_detail.json")
+    schema_file = os.path.join(
+        schema_dir, "netsuite_general_ledger_detail.json"
+    )
     with open(schema_file, 'w') as f:
         json.dump(schema, f, indent=2)
 

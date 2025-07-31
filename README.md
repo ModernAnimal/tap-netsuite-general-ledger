@@ -37,19 +37,22 @@ The tap requires the following configuration parameters:
 - `netsuite_consumer_secret`: OAuth consumer secret  
 - `netsuite_token_id`: OAuth token ID
 - `netsuite_token_secret`: OAuth token secret
-
-### Optional Configuration
-
 - `netsuite_script_id`: RESTlet script ID
 - `netsuite_deploy_id`: RESTlet deployment ID
 - `netsuite_search_id`: Saved search ID
-- `period_id`: Specific period ID to extract
-- `period_name`: Specific period name to extract (e.g., "Jan 2024")
+
+### Optional Configuration
+
+- `period_ids`: List of period IDs to extract (e.g., ["123", "124", "125"])
+- `period_names`: List of period names to extract (e.g., ["Jan 2024", "Feb 2024", "Mar 2024"])
+
+**Note**: You can specify either `period_ids` or `period_names`, but not both. Both parameters accept either a single value or a list of values. When using multiple periods, the tap will fetch data for each period and combine the results.
 
 **Note**: See `example_rolling_window_config.json` for a complete configuration template with rolling window examples.
 
 ### Sample Configuration
 
+**Single period:**
 ```json
 {
   "netsuite_account": "your_account_id",
@@ -60,7 +63,22 @@ The tap requires the following configuration parameters:
   "netsuite_script_id": "your_script_id",
   "netsuite_deploy_id": "your_deploy_id",
   "netsuite_search_id": "your_search_id",
-  "period_name": "Jan 2024"
+  "period_names": ["Jan 2024"]
+}
+```
+
+**Multiple periods:**
+```json
+{
+  "netsuite_account": "your_account_id",
+  "netsuite_consumer_key": "your_consumer_key",
+  "netsuite_consumer_secret": "your_consumer_secret",
+  "netsuite_token_id": "your_token_id",
+  "netsuite_token_secret": "your_token_secret",
+  "netsuite_script_id": "your_script_id",
+  "netsuite_deploy_id": "your_deploy_id",
+  "netsuite_search_id": "your_search_id",
+  "period_names": ["Jan 2024", "Feb 2024", "Mar 2024"]
 }
 ```
 
@@ -69,7 +87,7 @@ The tap requires the following configuration parameters:
 **Monthly refresh for January 2024:**
 ```json
 {
-  "period_name": "Jan 2024",
+  "period_names": ["Jan 2024"],
   ...other config...
 }
 ```
@@ -77,7 +95,23 @@ The tap requires the following configuration parameters:
 **Quarterly refresh using period ID:**
 ```json
 {
-  "period_id": "123",
+  "period_ids": ["123"],
+  ...other config...
+}
+```
+
+**Multiple months refresh:**
+```json
+{
+  "period_names": ["Jan 2024", "Feb 2024", "Mar 2024"],
+  ...other config...
+}
+```
+
+**Multiple periods using IDs:**
+```json
+{
+  "period_ids": ["123", "124", "125"],
   ...other config...
 }
 ```
