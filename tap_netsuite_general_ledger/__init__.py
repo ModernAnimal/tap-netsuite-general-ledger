@@ -74,7 +74,19 @@ def do_sync(config: Dict[str, Any], state: Dict[str, Any],
     for stream in selected_streams:
         LOGGER.info(f"Syncing stream: {stream.tap_stream_id}")
         state = sync_stream(client, stream, state, config)
-        singer.write_state(state)
+        
+        # Handle broken pipe when writing state
+        try:
+            singer.write_state(state)
+        except BrokenPipeError:
+            LOGGER.warning(
+                "Broken pipe detected when writing state - exiting gracefully"
+            )
+            break
+        except Exception as e:
+            LOGGER.error(f"Error writing state: {str(e)}")
+            # Continue with next stream if state write fails
+            continue
 
 
 def main() -> None:

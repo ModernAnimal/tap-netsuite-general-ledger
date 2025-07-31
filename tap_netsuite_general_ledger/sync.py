@@ -202,27 +202,67 @@ def sync_stream(
 
     LOGGER.info(f"Processing {len(records)} records for full refresh")
 
-    # Transform and write records
+    # Transform and write records with batch processing to reduce memory
+    # pressure
     record_count = 0
-    for record in records:
-        try:
-            transformed = transform_record(record, client)
-            singer.write_record(stream_name, transformed)
-            record_count += 1
+    # Allow configurable batch size
+    batch_size = config.get('batch_size', 1000)
+    
+    for i in range(0, len(records), batch_size):
+        batch = records[i:i + batch_size]
+        batch_processed = 0
+        
+        for record in batch:
+            try:
+                transformed = transform_record(record, client)
+                
+                # Handle broken pipe gracefully
+                try:
+                    singer.write_record(stream_name, transformed)
+                    record_count += 1
+                    batch_processed += 1
+                except BrokenPipeError:
+                    LOGGER.warning(
+                        "Broken pipe detected - downstream process terminated"
+                    )
+                    LOGGER.info(
+                        f"Successfully processed {record_count} records "
+                        f"before pipe break"
+                    )
+                    return _update_state(
+                        state, stream_name, record_count, sync_params
+                    )
+                except Exception as write_error:
+                    LOGGER.error(f"Error writing record: {str(write_error)}")
+                    # For other write errors, continue processing
+                    continue
 
-            # Log progress every 1000 records
-            if record_count % 1000 == 0:
-                LOGGER.info(f"Processed {record_count} records")
+            except Exception as e:
+                LOGGER.error(f"Error transforming record: {str(e)}")
+                LOGGER.error(f"Record data: {record}")
+                continue
 
-        except Exception as e:
-            LOGGER.error(f"Error transforming record: {str(e)}")
-            LOGGER.error(f"Record data: {record}")
-            continue
+        # Log progress after each batch
+        LOGGER.info(
+            f"Completed batch {i//batch_size + 1}: "
+            f"processed {batch_processed}/{len(batch)} records "
+            f"(total: {record_count})"
+        )
 
     LOGGER.info(
         f"Completed full refresh for {stream_name}: {record_count} records"
     )
 
+    return _update_state(state, stream_name, record_count, sync_params)
+
+
+def _update_state(
+    state: Dict[str, Any],
+    stream_name: str,
+    record_count: int,
+    sync_params: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Helper function to update state consistently"""
     # Update state with completion time and date range
     sync_date_range = ""
     if sync_params.get('period_names'):
