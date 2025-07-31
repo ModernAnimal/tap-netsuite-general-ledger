@@ -73,19 +73,29 @@ def do_sync(config: Dict[str, Any], state: Dict[str, Any],
     # Sync each selected stream
     for stream in selected_streams:
         LOGGER.info(f"Syncing stream: {stream.tap_stream_id}")
-        state = sync_stream(client, stream, state, config)
-        
-        # Handle broken pipe when writing state
         try:
-            singer.write_state(state)
-        except BrokenPipeError:
-            LOGGER.warning(
-                "Broken pipe detected when writing state - exiting gracefully"
+            state = sync_stream(client, stream, state, config)
+
+            # Final state write after stream completion
+            try:
+                singer.write_state(state)
+            except BrokenPipeError:
+                LOGGER.warning(
+                    "Broken pipe detected when writing final state - "
+                    "exiting gracefully"
+                )
+                break
+            except Exception as e:
+                LOGGER.error(f"Error writing final state: {str(e)}")
+                # Continue with next stream if state write fails
+                continue
+                
+        except Exception as stream_error:
+            LOGGER.error(
+                f"Error syncing stream {stream.tap_stream_id}: "
+                f"{str(stream_error)}"
             )
-            break
-        except Exception as e:
-            LOGGER.error(f"Error writing state: {str(e)}")
-            # Continue with next stream if state write fails
+            # Continue with other streams
             continue
 
 
@@ -129,6 +139,15 @@ def main() -> None:
     if args.state:
         with open(args.state) as f:
             state = json.load(f)
+
+    # Ensure state has proper Singer format
+    if state and 'bookmarks' not in state:
+        # Convert old format to new format if needed
+        old_format_state = state.copy()
+        state = {'bookmarks': {}}
+        for stream_name, stream_state in old_format_state.items():
+            if isinstance(stream_state, dict):
+                state['bookmarks'][stream_name] = stream_state
 
     if args.discover:
         do_discover(config)

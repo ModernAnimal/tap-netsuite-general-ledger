@@ -210,12 +210,49 @@ def sync_stream(
 
     if not records:
         LOGGER.warning("No records found for the specified date range")
-        return state
+        # Still need to write final state for empty result
+        final_state = state.copy() if state else {}
+        if 'bookmarks' not in final_state:
+            final_state['bookmarks'] = {}
+        
+        final_state['bookmarks'][stream_name] = {
+            'last_sync': datetime.now(timezone.utc).isoformat(),
+            'record_count': 0,
+            'replication_method': 'FULL_TABLE',
+            'sync_parameters': sync_params
+        }
+        try:
+            singer.write_state(final_state)
+        except BrokenPipeError:
+            LOGGER.warning(
+                "Broken pipe detected when writing state - exiting gracefully"
+            )
+        return final_state
 
     LOGGER.info(f"Fetched {len(records)} records, now processing...")
 
     # Process ALL records in one continuous stream
     record_count = 0
+    # Write state every 100k records to match target batch size
+    state_write_interval = 100000
+    
+    # Emit initial state with sync start information
+    current_state = state.copy() if state else {}
+    if 'bookmarks' not in current_state:
+        current_state['bookmarks'] = {}
+    
+    current_state['bookmarks'][stream_name] = {
+        'replication_method': 'FULL_TABLE',
+        'sync_started': datetime.now(timezone.utc).isoformat(),
+        'sync_parameters': sync_params
+    }
+    try:
+        singer.write_state(current_state)
+    except BrokenPipeError:
+        LOGGER.warning("Broken pipe detected when writing initial state")
+    except Exception as state_error:
+        LOGGER.error(f"Error writing initial state: {str(state_error)}")
+
     for record_index, record in enumerate(records):
         try:
             # Extract period info from sync params for unique ID generation
@@ -223,12 +260,12 @@ def sync_stream(
             if 'period_ids' in sync_params and sync_params['period_ids']:
                 period_info = f"pid_{sync_params['period_ids'][0]}"
             elif 'period_names' in sync_params and sync_params['period_names']:
-                period_info = f"pname_{sync_params['period_names'][0]}"
-            
+                period_info = f"{sync_params['period_names'][0]}"
+
             transformed = transform_record(
                 record, client, record_index, period_info
             )
-            
+
             try:
                 singer.write_record(stream_name, transformed)
                 record_count += 1
@@ -242,9 +279,33 @@ def sync_stream(
                 LOGGER.error(f"Error writing record: {str(write_error)}")
                 continue
 
-            # Log progress every 10000 records
-            if record_count % 10000 == 0:
+            # Write state periodically and log progress
+            if record_count % state_write_interval == 0:
                 LOGGER.info(f"Processed {record_count} records")
+                
+                # Update state with current progress in Singer format
+                progress_pct = round((record_count / len(records)) * 100, 2)
+                current_state['bookmarks'][stream_name] = {
+                    'last_sync': datetime.now(timezone.utc).isoformat(),
+                    'record_count': record_count,
+                    'replication_method': 'FULL_TABLE',
+                    'sync_parameters': sync_params,
+                    'total_records': len(records),
+                    'progress_percentage': progress_pct
+                }
+                
+                # Write state to provide checkpointing capability
+                try:
+                    singer.write_state(current_state)
+                except BrokenPipeError:
+                    LOGGER.warning(
+                        f"Broken pipe detected when writing state after "
+                        f"{record_count} records - exiting gracefully"
+                    )
+                    break
+                except Exception as state_error:
+                    LOGGER.error(f"Error writing state: {str(state_error)}")
+                    # Continue processing even if state write fails
 
         except Exception as e:
             LOGGER.error(f"Error processing record: {str(e)}")
@@ -252,12 +313,16 @@ def sync_stream(
 
     LOGGER.info(f"Completed sync: {record_count} records processed")
 
-    # Update state
-    state[stream_name] = {
+    # Final state update in Singer format
+    final_progress = (100.0 if record_count == len(records)
+                      else round((record_count / len(records)) * 100, 2))
+    current_state['bookmarks'][stream_name] = {
         'last_sync': datetime.now(timezone.utc).isoformat(),
         'record_count': record_count,
         'replication_method': 'FULL_TABLE',
-        'sync_parameters': sync_params
+        'sync_parameters': sync_params,
+        'total_records': len(records),
+        'progress_percentage': final_progress
     }
 
-    return state
+    return current_state
