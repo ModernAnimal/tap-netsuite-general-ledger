@@ -32,7 +32,6 @@ FIELD_MAPPING = {
     'class': 'class',
     'location': 'location',
     'department': 'department',
-    'transaction_line_id': 'lineid',
     'name_line': 'entity',
     'memo_main': 'memo',
     'memo_line': 'memoline',
@@ -42,7 +41,8 @@ FIELD_MAPPING = {
     'created_by': 'createdby',
     'name': 'name',
     'posting': 'posting',
-    'company_name': 'companyname'
+    'company_name': 'companyname',
+    'transaction_line_id': 'line'
 }
 
 

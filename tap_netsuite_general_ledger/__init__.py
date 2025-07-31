@@ -89,7 +89,7 @@ def do_sync(config: Dict[str, Any], state: Dict[str, Any],
                 LOGGER.error(f"Error writing final state: {str(e)}")
                 # Continue with next stream if state write fails
                 continue
-                
+
         except Exception as stream_error:
             LOGGER.error(
                 f"Error syncing stream {stream.tap_stream_id}: "
