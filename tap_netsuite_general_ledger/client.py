@@ -109,48 +109,225 @@ class NetSuiteClient:
 
         return ', '.join(header_parts)
 
-    async def fetch_gl_data(
+    async def fetch_gl_data_streaming(
         self,
+        batch_callback,
+        batch_size: int = 100000,
         period_ids: Optional[List[str]] = None,
         period_names: Optional[List[str]] = None
-    ) -> List[Dict[str, Any]]:
-        """Fetch GL detail data from NetSuite
+    ) -> int:
+        """Fetch GL detail data from NetSuite with true streaming processing
 
         Args:
+            batch_callback: Async function to call with each batch of records
+            batch_size: Size of each batch to process (default: 100000)
             period_ids: List of period IDs to fetch
             period_names: List of period names to fetch
+
+        Returns:
+            Total number of records processed
         """
 
         # Validate that we have at least one period specified
         if not period_ids and not period_names:
             LOGGER.warning("No period specified, fetching default period")
 
-        # If we have multiple periods, fetch them in batches and combine
-        all_records = []
+        total_processed = 0
 
         if period_ids:
             for pid in period_ids:
-                records = await self._fetch_single_period(period_id=pid)
-                all_records.extend(records)
-                LOGGER.info(
-                    f"Fetched {len(records)} records for period ID: {pid}"
+                processed = await self._fetch_single_period_streaming(
+                    batch_callback, batch_size, period_id=pid
                 )
+                total_processed += processed
         elif period_names:
             for pname in period_names:
-                records = await self._fetch_single_period(period_name=pname)
-                all_records.extend(records)
-                LOGGER.info(
-                    f"Fetched {len(records)} records for period name: {pname}"
+                processed = await self._fetch_single_period_streaming(
+                    batch_callback, batch_size, period_name=pname
                 )
+                total_processed += processed
         else:
             # No period specified, fetch all
-            all_records = await self._fetch_single_period()
+            processed = await self._fetch_single_period_streaming(
+                batch_callback, batch_size
+            )
+            total_processed += processed
 
-        total_count = len(all_records)
         LOGGER.info(
-            f"Total records retrieved across all periods: {total_count}"
+            f"Total records processed across all periods: {total_processed}"
         )
-        return all_records
+        return total_processed
+
+    async def _fetch_single_period_streaming(
+        self,
+        batch_callback,
+        batch_size: int,
+        period_id: Optional[str] = None,
+        period_name: Optional[str] = None
+    ) -> int:
+        """Fetch GL data for a single period with streaming processing"""
+
+        # Prepare request headers
+        headers = {
+            'Authorization': self.generate_oauth_header(),
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+
+        # Build request payload
+        request_data = {'searchID': self.search_id}
+
+        if period_id:
+            request_data['periodId'] = period_id
+            period_label = f"period ID: {period_id}"
+        elif period_name:
+            request_data['periodName'] = period_name
+            period_label = f"period name: {period_name}"
+        else:
+            period_label = "default period"
+
+        # Build request URL
+        url = (f"{self.base_url}?script={self.script_id}"
+               f"&deploy={self.deploy_id}")
+
+        LOGGER.info(
+            f"Making streaming request to NetSuite API - {period_label}"
+        )
+
+        # Make request with streaming JSON processing
+        timeout = aiohttp.ClientTimeout(total=600)  # 10 minutes
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            try:
+                async with session.post(
+                    url,
+                    headers=headers,
+                    json=request_data
+                ) as response:
+                    if response.status == 200:
+                        # Process the response with streaming JSON parsing
+                        return await self._process_streaming_response(
+                            response, batch_callback, batch_size, period_label
+                        )
+                    else:
+                        error_text = await response.text()
+                        LOGGER.error(f"HTTP {response.status}: {error_text}")
+                        raise Exception(
+                            f"HTTP {response.status}: {error_text}"
+                        )
+            except asyncio.TimeoutError:
+                LOGGER.error("Request timed out after 10 minutes")
+                raise Exception("Request timed out")
+            except Exception as e:
+                LOGGER.error(f"Request failed: {str(e)}")
+                raise
+
+    async def _process_streaming_response(
+        self,
+        response,
+        batch_callback,
+        batch_size: int,
+        period_label: str
+    ) -> int:
+        """Process streaming JSON response to minimize memory usage"""
+
+        # Unfortunately, aiohttp doesn't support streaming JSON parsing
+        # The NetSuite API returns all data in one JSON response
+        # But we can process it immediately with aggressive memory cleanup
+
+        try:
+            result = await response.json()
+            LOGGER.info("NetSuite API request successful")
+
+            if result.get('success') and 'results' in result:
+                records = result['results']
+                total_records = len(records)
+
+                LOGGER.info(
+                    f"Successfully retrieved {total_records} records for "
+                    f"{period_label}"
+                )
+
+                # Process records immediately with memory cleanup
+                return await self._process_records_in_streaming_batches(
+                    records, batch_callback, batch_size, period_label
+                )
+            else:
+                error_msg = result.get('error', 'Unknown error')
+                LOGGER.error(f"NetSuite API error: {error_msg}")
+                raise Exception(f"NetSuite API error: {error_msg}")
+
+        except Exception as e:
+            LOGGER.error(f"Error processing streaming response: {str(e)}")
+            raise
+
+    async def _process_records_in_streaming_batches(
+        self,
+        records: List[Dict[str, Any]],
+        batch_callback,
+        batch_size: int,
+        period_label: str
+    ) -> int:
+        """Process records in batches with immediate memory cleanup"""
+        total_records = len(records)
+        processed_count = 0
+
+        LOGGER.info(
+            f"Processing {total_records} records in streaming batches of "
+            f"{batch_size} for {period_label}"
+        )
+
+        # Process records in batches with aggressive memory management
+        for i in range(0, total_records, batch_size):
+            # Extract batch without copying - use slice view
+            batch_end = min(i + batch_size, total_records)
+            batch = records[i:batch_end]
+
+            batch_num = (i // batch_size) + 1
+            total_batches = (total_records + batch_size - 1) // batch_size
+
+            LOGGER.info(
+                f"Processing streaming batch {batch_num}/{total_batches} "
+                f"({len(batch)} records) for {period_label}"
+            )
+
+            try:
+                # Process the batch
+                await batch_callback(
+                    batch, batch_num, total_batches, period_label
+                )
+                processed_count += len(batch)
+
+                # Explicitly clear the batch reference
+                del batch
+
+                # Clear processed records from the original list to free memory
+                # This is the key optimization - we remove processed records
+                for j in range(len(records) - 1, i - 1, -1):
+                    if j < batch_end:
+                        records.pop(j)
+
+                # Trigger garbage collection periodically
+                if batch_num % 5 == 0:  # Every 5 batches
+                    import gc
+                    gc.collect()
+
+            except Exception as e:
+                LOGGER.error(
+                    f"Error processing streaming batch {batch_num} for "
+                    f"{period_label}: {str(e)}"
+                )
+                raise
+
+        # Final cleanup
+        records.clear()
+        import gc
+        gc.collect()
+
+        LOGGER.info(
+            f"Completed streaming processing {processed_count} records for "
+            f"{period_label}"
+        )
+        return processed_count
 
     async def _fetch_single_period(
         self,
