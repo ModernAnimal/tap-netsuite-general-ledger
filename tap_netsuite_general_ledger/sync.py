@@ -179,103 +179,9 @@ def sync_stream(
     LOGGER.info(f"Sync parameters: {sync_params}")
 
     # For full refresh, we always truncate and reload
-    # This ensures any deletions in NetSuite are reflected in the target
     LOGGER.info(f"Performing FULL_TABLE refresh for {stream_name}")
 
-    # Note: Singer targets handle table truncation automatically for FULL_TABLE
-    # replication method when they receive the schema message
-
-    # Check if we should use streaming for large datasets
-    use_streaming = config.get('use_streaming', True)
-
-    if use_streaming:
-        LOGGER.info("Using streaming mode for memory efficiency")
-        return _sync_stream_streaming(
-            client, stream, state, config, sync_params
-        )
-    else:
-        LOGGER.info("Using batch mode (loads all records into memory)")
-        return _sync_stream_batch(client, stream, state, config, sync_params)
-
-
-def _sync_stream_streaming(
-    client: NetSuiteClient,
-    stream: CatalogEntry,
-    state: Dict[str, Any],
-    config: Dict[str, Any],
-    sync_params: Dict[str, Any]
-) -> Dict[str, Any]:
-    """Sync using streaming approach - better for large datasets"""
-
-    stream_name = stream.tap_stream_id
-    record_count = 0
-
-    # Set up async event loop
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    try:
-        # Create async generator for streaming records
-        async def process_records():
-            nonlocal record_count
-
-            async for record in client.fetch_gl_data_streaming(**sync_params):
-                try:
-                    transformed = transform_record(record, client)
-
-                    # Write record immediately in continuous stream
-                    try:
-                        singer.write_record(stream_name, transformed)
-                        record_count += 1
-                    except BrokenPipeError:
-                        LOGGER.warning(
-                            "Broken pipe detected - downstream process "
-                            "terminated"
-                        )
-                        LOGGER.info(
-                            f"Successfully processed {record_count} records "
-                            f"before pipe break"
-                        )
-                        return
-                    except Exception as write_error:
-                        LOGGER.error(
-                            f"Error writing record: {str(write_error)}"
-                        )
-                        continue
-
-                    # Log progress every 10000 records
-                    if record_count % 10000 == 0:
-                        LOGGER.info(f"Streamed {record_count} records")
-
-                except Exception as e:
-                    LOGGER.error(f"Error transforming record: {str(e)}")
-                    continue
-
-        # Run the streaming process
-        loop.run_until_complete(process_records())
-
-    finally:
-        loop.close()
-
-    LOGGER.info(
-        f"Completed streaming sync for {stream_name}: {record_count} records"
-    )
-
-    return _update_state(state, stream_name, record_count, sync_params)
-
-
-def _sync_stream_batch(
-    client: NetSuiteClient,
-    stream: CatalogEntry,
-    state: Dict[str, Any],
-    config: Dict[str, Any],
-    sync_params: Dict[str, Any]
-) -> Dict[str, Any]:
-    """Sync using batch approach - loads all records into memory first"""
-
-    stream_name = stream.tap_stream_id
-
-    # Fetch data asynchronously
+    # Fetch ALL data first
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
@@ -290,80 +196,32 @@ def _sync_stream_batch(
         LOGGER.warning("No records found for the specified date range")
         return state
 
-    LOGGER.info(f"Processing {len(records)} records for full refresh")
+    LOGGER.info(f"Fetched {len(records)} records, now processing...")
 
-    # Transform and write records in one continuous stream
-    # This prevents broken pipe issues caused by batching interruptions
+    # Process ALL records in one continuous stream
     record_count = 0
-
     for record in records:
         try:
             transformed = transform_record(record, client)
+            singer.write_record(stream_name, transformed)
+            record_count += 1
 
-            # Write record immediately - no batching to avoid pipe issues
-            try:
-                singer.write_record(stream_name, transformed)
-                record_count += 1
-            except BrokenPipeError:
-                LOGGER.warning(
-                    "Broken pipe detected - downstream process terminated"
-                )
-                LOGGER.info(
-                    f"Successfully processed {record_count} records "
-                    f"before pipe break"
-                )
-                return _update_state(
-                    state, stream_name, record_count, sync_params
-                )
-            except Exception as write_error:
-                LOGGER.error(f"Error writing record: {str(write_error)}")
-                # For other write errors, continue processing
-                continue
-
-            # Log progress every 10000 records to reduce log noise
+            # Log progress every 10000 records
             if record_count % 10000 == 0:
                 LOGGER.info(f"Processed {record_count} records")
 
         except Exception as e:
-            LOGGER.error(f"Error transforming record: {str(e)}")
-            LOGGER.error(f"Record data: {record}")
+            LOGGER.error(f"Error processing record: {str(e)}")
             continue
 
-    LOGGER.info(
-        f"Completed full refresh for {stream_name}: {record_count} records"
-    )
+    LOGGER.info(f"Completed sync: {record_count} records processed")
 
-    return _update_state(state, stream_name, record_count, sync_params)
-
-
-def _update_state(
-    state: Dict[str, Any],
-    stream_name: str,
-    record_count: int,
-    sync_params: Dict[str, Any]
-) -> Dict[str, Any]:
-    """Helper function to update state consistently"""
-    # Update state with completion time and date range
-    sync_date_range = ""
-    if sync_params.get('period_names'):
-        periods = sync_params['period_names']
-        if len(periods) == 1:
-            sync_date_range = f" (period: {periods[0]})"
-        else:
-            sync_date_range = f" (periods: {', '.join(periods)})"
-    elif sync_params.get('period_ids'):
-        period_ids = sync_params['period_ids']
-        if len(period_ids) == 1:
-            sync_date_range = f" (period ID: {period_ids[0]})"
-        else:
-            sync_date_range = f" (period IDs: {', '.join(period_ids)})"
-
+    # Update state
     state[stream_name] = {
         'last_sync': datetime.now(timezone.utc).isoformat(),
         'record_count': record_count,
         'replication_method': 'FULL_TABLE',
-        'sync_parameters': sync_params,
-        'sync_note': f"Full refresh completed{sync_date_range}"
+        'sync_parameters': sync_params
     }
 
     return state
