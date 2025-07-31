@@ -32,7 +32,6 @@ FIELD_MAPPING = {
     'class': 'class',
     'location': 'location',
     'department': 'department',
-    'line': 'line',
     'name_line': 'entity',
     'memo_main': 'memo',
     'memo_line': 'memoline',
@@ -42,7 +41,8 @@ FIELD_MAPPING = {
     'created_by': 'createdby',
     'name': 'name',
     'posting': 'posting',
-    'company_name': 'companyname'
+    'company_name': 'companyname',
+    'transaction_line_id': 'line'
 }
 
 
@@ -97,7 +97,10 @@ def format_date(date_str: str) -> str:
         return date_str
 
 
-def transform_record(record: Dict[str, Any], client: NetSuiteClient) -> Dict[str, Any]:
+def transform_record(
+    record: Dict[str, Any],
+    client: NetSuiteClient
+) -> Dict[str, Any]:
     """Transform NetSuite record to our schema format"""
     transformed = {}
 
@@ -113,7 +116,11 @@ def transform_record(record: Dict[str, Any], client: NetSuiteClient) -> Dict[str
         raw_value = client.extract_field_value(record, netsuite_field)
 
         # Apply type-specific transformations
-        if schema_field in ['amount_debit', 'amount_credit', 'amount_net', 'amount_transaction_total']:
+        amount_fields = [
+            'amount_debit', 'amount_credit', 'amount_net',
+            'amount_transaction_total'
+        ]
+        if schema_field in amount_fields:
             transformed[schema_field] = convert_to_number(raw_value)
         elif schema_field in ['date', 'date_created']:
             transformed[schema_field] = format_date(raw_value)
@@ -127,10 +134,27 @@ def get_sync_params(config: Dict[str, Any]) -> Dict[str, Any]:
     """Extract sync parameters from config"""
     params = {}
 
-    if config.get('period_id'):
-        params['period_id'] = config['period_id']
+    # Handle period_ids (convert single values to lists for compatibility)
+    if config.get('period_ids'):
+        period_ids = config['period_ids']
+        if isinstance(period_ids, list):
+            params['period_ids'] = period_ids
+        else:
+            params['period_ids'] = [period_ids]
+    elif config.get('period_id'):
+        # Legacy support: convert single period_id to list
+        params['period_ids'] = [config['period_id']]
+
+    # Handle period_names (convert single values to lists for compatibility)
+    elif config.get('period_names'):
+        period_names = config['period_names']
+        if isinstance(period_names, list):
+            params['period_names'] = period_names
+        else:
+            params['period_names'] = [period_names]
     elif config.get('period_name'):
-        params['period_name'] = config['period_name']
+        # Legacy support: convert single period_name to list
+        params['period_names'] = [config['period_name']]
 
     return params
 
@@ -147,20 +171,18 @@ def sync_stream(
     LOGGER.info(f"Starting full refresh sync for stream: {stream_name}")
 
     # Write schema
-    singer.write_schema(stream_name, stream.schema.to_dict(), stream.key_properties)
+    singer.write_schema(
+        stream_name, stream.schema.to_dict(), stream.key_properties
+    )
 
     # Get sync parameters
     sync_params = get_sync_params(config)
     LOGGER.info(f"Sync parameters: {sync_params}")
 
     # For full refresh, we always truncate and reload
-    # This ensures any deletions in NetSuite are reflected in the target
     LOGGER.info(f"Performing FULL_TABLE refresh for {stream_name}")
 
-    # Note: Singer targets handle table truncation automatically for FULL_TABLE
-    # replication method when they receive the schema message
-
-    # Fetch data asynchronously
+    # Fetch ALL data first
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
@@ -173,44 +195,112 @@ def sync_stream(
 
     if not records:
         LOGGER.warning("No records found for the specified date range")
-        return state
+        # Still need to write final state for empty result
+        final_state = state.copy() if state else {}
+        if 'bookmarks' not in final_state:
+            final_state['bookmarks'] = {}
 
-    LOGGER.info(f"Processing {len(records)} records for full refresh")
-
-    # Transform and write records
-    record_count = 0
-    for record in records:
+        final_state['bookmarks'][stream_name] = {
+            'last_sync': datetime.now(timezone.utc).isoformat(),
+            'record_count': 0,
+            'replication_method': 'FULL_TABLE',
+            'sync_parameters': sync_params
+        }
         try:
-            transformed = transform_record(record, client)
-            singer.write_record(stream_name, transformed)
-            record_count += 1
+            singer.write_state(final_state)
+        except BrokenPipeError:
+            LOGGER.warning(
+                "Broken pipe detected when writing state - exiting gracefully"
+            )
+        return final_state
 
-            # Log progress every 1000 records
-            if record_count % 1000 == 0:
+    LOGGER.info(f"Fetched {len(records)} records, now processing...")
+
+    # Process ALL records in one continuous stream
+    record_count = 0
+    # Write state every 100k records to match target batch size
+    state_write_interval = 100000
+
+    # Emit initial state with sync start information
+    current_state = state.copy() if state else {}
+    if 'bookmarks' not in current_state:
+        current_state['bookmarks'] = {}
+
+    current_state['bookmarks'][stream_name] = {
+        'replication_method': 'FULL_TABLE',
+        'sync_started': datetime.now(timezone.utc).isoformat(),
+        'sync_parameters': sync_params
+    }
+    try:
+        singer.write_state(current_state)
+    except BrokenPipeError:
+        LOGGER.warning("Broken pipe detected when writing initial state")
+    except Exception as state_error:
+        LOGGER.error(f"Error writing initial state: {str(state_error)}")
+
+    for record_index, record in enumerate(records):
+        try:
+            transformed = transform_record(
+                record, client
+            )
+
+            try:
+                singer.write_record(stream_name, transformed)
+                record_count += 1
+            except BrokenPipeError:
+                LOGGER.error(
+                    f"Broken pipe error - target process terminated after "
+                    f"{record_count} records. Check target logs for errors."
+                )
+                break
+            except Exception as write_error:
+                LOGGER.error(f"Error writing record: {str(write_error)}")
+                continue
+
+            # Write state periodically and log progress
+            if record_count % state_write_interval == 0:
                 LOGGER.info(f"Processed {record_count} records")
 
+                # Update state with current progress in Singer format
+                progress_pct = round((record_count / len(records)) * 100, 2)
+                current_state['bookmarks'][stream_name] = {
+                    'last_sync': datetime.now(timezone.utc).isoformat(),
+                    'record_count': record_count,
+                    'replication_method': 'FULL_TABLE',
+                    'sync_parameters': sync_params,
+                    'total_records': len(records),
+                    'progress_percentage': progress_pct
+                }
+
+                # Write state to provide checkpointing capability
+                try:
+                    singer.write_state(current_state)
+                except BrokenPipeError:
+                    LOGGER.warning(
+                        f"Broken pipe detected when writing state after "
+                        f"{record_count} records - exiting gracefully"
+                    )
+                    break
+                except Exception as state_error:
+                    LOGGER.error(f"Error writing state: {str(state_error)}")
+                    # Continue processing even if state write fails
+
         except Exception as e:
-            LOGGER.error(f"Error transforming record: {str(e)}")
-            LOGGER.error(f"Record data: {record}")
+            LOGGER.error(f"Error processing record: {str(e)}")
             continue
 
-    LOGGER.info(
-        f"Completed full refresh for {stream_name}: {record_count} records"
-    )
+    LOGGER.info(f"Completed sync: {record_count} records processed")
 
-    # Update state with completion time and date range
-    sync_date_range = ""
-    if sync_params.get('period_name'):
-        sync_date_range = f" (period: {sync_params['period_name']})"
-    elif sync_params.get('period_id'):
-        sync_date_range = f" (period ID: {sync_params['period_id']})"
-
-    state[stream_name] = {
+    # Final state update in Singer format
+    final_progress = (100.0 if record_count == len(records)
+                      else round((record_count / len(records)) * 100, 2))
+    current_state['bookmarks'][stream_name] = {
         'last_sync': datetime.now(timezone.utc).isoformat(),
         'record_count': record_count,
         'replication_method': 'FULL_TABLE',
         'sync_parameters': sync_params,
-        'sync_note': f"Full refresh completed{sync_date_range}"
+        'total_records': len(records),
+        'progress_percentage': final_progress
     }
 
-    return state
+    return current_state
