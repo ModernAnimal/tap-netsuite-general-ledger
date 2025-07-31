@@ -15,6 +15,10 @@ def get_gl_detail_schema() -> Dict[str, Any]:
     return {
         "type": "object",
         "properties": {
+            "row_id": {
+                "type": "string",
+                "description": "Unique row identifier (hash of key fields)"
+            },
             "internal_id": {
                 "type": ["null", "string"],
                 "description": "Internal ID of the transaction"
@@ -145,7 +149,7 @@ def discover_streams(config: Dict[str, Any]) -> Catalog:
         tap_stream_id="netsuite_general_ledger_detail",
         stream="netsuite_general_ledger_detail",
         schema=gl_detail_schema,
-        key_properties=[],
+        key_properties=["row_id"],
         metadata=gl_detail_metadata
     )
 
@@ -158,7 +162,9 @@ def save_schema_to_file() -> None:
     schema_dir = os.path.join(os.path.dirname(__file__), "schemas")
     os.makedirs(schema_dir, exist_ok=True)
 
-    schema_file = os.path.join(schema_dir, "netsuite_general_ledger_detail.json")
+    schema_file = os.path.join(
+        schema_dir, "netsuite_general_ledger_detail.json"
+    )
     with open(schema_file, 'w') as f:
         json.dump(schema, f, indent=2)
 

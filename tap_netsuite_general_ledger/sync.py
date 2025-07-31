@@ -3,6 +3,7 @@ Sync functionality for NetSuite GL Detail tap
 """
 
 import asyncio
+import hashlib
 from datetime import datetime, timezone
 from typing import Dict, Any
 from decimal import InvalidOperation
@@ -97,6 +98,26 @@ def format_date(date_str: str) -> str:
         return date_str
 
 
+def generate_row_id(record: Dict[str, Any]) -> str:
+    """Generate a unique row ID from key fields"""
+    # Use internal_id, line, account, and other fields to ensure uniqueness
+    key_fields = [
+        str(record.get('internal_id', '')),
+        str(record.get('line', '')),
+        str(record.get('account', '')),
+        str(record.get('amount_debit', '')),
+        str(record.get('amount_credit', '')),
+        str(record.get('document_number', '')),
+        str(record.get('date', '')),
+    ]
+
+    # Create hash from concatenated key fields
+    key_string = '|'.join(key_fields)
+    row_id = hashlib.md5(key_string.encode('utf-8')).hexdigest()
+
+    return row_id
+
+
 def transform_record(
     record: Dict[str, Any], client: NetSuiteClient
 ) -> Dict[str, Any]:
@@ -125,6 +146,9 @@ def transform_record(
             transformed[schema_field] = format_date(raw_value)
         else:
             transformed[schema_field] = raw_value if raw_value else None
+
+    # Generate unique row ID
+    transformed['row_id'] = generate_row_id(transformed)
 
     return transformed
 
@@ -203,8 +227,19 @@ def sync_stream(
     for record in records:
         try:
             transformed = transform_record(record, client)
-            singer.write_record(stream_name, transformed)
-            record_count += 1
+            
+            try:
+                singer.write_record(stream_name, transformed)
+                record_count += 1
+            except BrokenPipeError:
+                LOGGER.error(
+                    f"Broken pipe error - target process terminated after "
+                    f"{record_count} records. Check target logs for errors."
+                )
+                break
+            except Exception as write_error:
+                LOGGER.error(f"Error writing record: {str(write_error)}")
+                continue
 
             # Log progress every 10000 records
             if record_count % 10000 == 0:
