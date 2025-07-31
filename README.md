@@ -45,10 +45,32 @@ The tap requires the following configuration parameters:
 
 - `period_ids`: List of period IDs to extract (e.g., ["123", "124", "125"])
 - `period_names`: List of period names to extract (e.g., ["Jan 2024", "Feb 2024", "Mar 2024"])
+- `batch_size`: Number of records to process per batch (default: `100000`)
 
 **Note**: You can specify either `period_ids` or `period_names`, but not both. Both parameters accept either a single value or a list of values. When using multiple periods, the tap will fetch data for each period and combine the results.
 
-**Note**: See `example_rolling_window_config.json` for a complete configuration template with rolling window examples.
+### Memory-Optimized Processing (Always Enabled)
+
+The tap automatically uses memory-optimized processing to handle large datasets efficiently:
+
+```json
+{
+  "batch_size": 100000
+}
+```
+
+Memory-optimized processing is particularly beneficial for:
+- Large datasets (100k+ records)
+- Memory-constrained environments
+- Better error handling and progress tracking
+
+**Key Features:**
+- **Period-by-Period Processing**: Processes one period at a time with full memory cleanup between periods
+- **Batch Processing**: Configurable batch sizes (default: 100,000 records)
+- **Aggressive Memory Cleanup**: Removes processed records from memory immediately
+- **Progress Tracking**: Detailed logging and state updates
+
+See [STREAMING.md](./STREAMING.md) for detailed documentation on memory optimization.**Note**: See `example_rolling_window_config.json` for a complete configuration template with rolling window examples.
 
 ### Sample Configuration
 
