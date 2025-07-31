@@ -123,7 +123,7 @@ class NetSuiteClient:
 
         # Validate that we have at least one period specified
         if not period_ids and not period_names:
-            LOGGER.warning("No period specified, fetching all data")
+            LOGGER.warning("No period specified, fetching default period")
 
         # If we have multiple periods, fetch them in batches and combine
         all_records = []
@@ -178,10 +178,8 @@ class NetSuiteClient:
         url = (f"{self.base_url}?script={self.script_id}"
                f"&deploy={self.deploy_id}")
 
-        LOGGER.info(f"Fetching GL data with filters: {request_data}")
-        LOGGER.info(f"Making request to URL: {url}")
-        LOGGER.info(f"Request headers: {dict(headers)}")
-        LOGGER.info(f"Request payload: {request_data}")
+        LOGGER.info("Making request to NetSuite API")
+        # Note: Not logging headers/payload to avoid cluttering output
 
         # Make request with timeout
         timeout = aiohttp.ClientTimeout(total=600)  # 10 minutes
@@ -194,7 +192,8 @@ class NetSuiteClient:
                 ) as response:
                     if response.status == 200:
                         result = await response.json()
-                        LOGGER.info(f"NetSuite API response: {result}")
+                        # Don't log full API response - it can be massive
+                        LOGGER.info("NetSuite API request successful")
                         if result.get('success') and 'results' in result:
                             records = result['results']
                             LOGGER.info(
