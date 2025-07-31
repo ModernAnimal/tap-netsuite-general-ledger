@@ -103,12 +103,20 @@ def generate_row_id(record: Dict[str, Any]) -> str:
     # Use internal_id, line, account, and other fields to ensure uniqueness
     key_fields = [
         str(record.get('internal_id', '')),
-        str(record.get('line', '')),
+        str(record.get('period', '')),
+        str(record.get('type', '')),
         str(record.get('account', '')),
         str(record.get('amount_debit', '')),
         str(record.get('amount_credit', '')),
         str(record.get('document_number', '')),
+        str(record.get('approval_status', '')),
         str(record.get('date', '')),
+        str(record.get('date_created', '')),
+        str(record.get('class', '')),
+        str(record.get('location', '')),
+        str(record.get('department', '')),
+        str(record.get('memo_main', '')),
+        str(record.get('name_line', '')),
     ]
 
     # Create hash from concatenated key fields
