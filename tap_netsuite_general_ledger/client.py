@@ -152,6 +152,64 @@ class NetSuiteClient:
         )
         return all_records
 
+    async def fetch_gl_data_streaming(
+        self,
+        period_ids: Optional[List[str]] = None,
+        period_names: Optional[List[str]] = None
+    ):
+        """Generator that yields GL detail records one at a time to reduce
+        memory usage
+        
+        This is better for large datasets (400k+ records) as it doesn't load
+        everything into memory at once.
+        """
+        
+        # Validate that we have at least one period specified
+        if not period_ids and not period_names:
+            LOGGER.warning("No period specified, fetching all data")
+
+        total_count = 0
+
+        if period_ids:
+            for pid in period_ids:
+                LOGGER.info(f"Fetching records for period ID: {pid}")
+                records = await self._fetch_single_period(period_id=pid)
+                period_count = len(records)
+                total_count += period_count
+                LOGGER.info(
+                    f"Retrieved {period_count} records for period ID: {pid}"
+                )
+                
+                # Yield records one by one to keep memory usage low
+                for record in records:
+                    yield record
+                    
+        elif period_names:
+            for pname in period_names:
+                LOGGER.info(f"Fetching records for period name: {pname}")
+                records = await self._fetch_single_period(period_name=pname)
+                period_count = len(records)
+                total_count += period_count
+                LOGGER.info(
+                    f"Retrieved {period_count} records for period name: "
+                    f"{pname}"
+                )
+                
+                # Yield records one by one to keep memory usage low
+                for record in records:
+                    yield record
+        else:
+            # No period specified, fetch all
+            records = await self._fetch_single_period()
+            total_count = len(records)
+            
+            for record in records:
+                yield record
+
+        LOGGER.info(
+            f"Total records streamed across all periods: {total_count}"
+        )
+
     async def _fetch_single_period(
         self,
         period_id: Optional[str] = None,
