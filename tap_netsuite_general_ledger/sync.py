@@ -101,22 +101,35 @@ def format_date(date_str: str) -> str:
 def generate_row_id(record: Dict[str, Any]) -> str:
     """Generate a unique row ID from key fields"""
     # Use internal_id, line, account, and other fields to ensure uniqueness
+    # Include every field available in the record, sorted by key for consistency
+    # Hardcode all schema fields for row uniqueness, in a consistent order
     key_fields = [
         str(record.get('internal_id', '')),
-        str(record.get('period', '')),
+        str(record.get('document_number', '')),
         str(record.get('type', '')),
+        str(record.get('journal_name', '')),
+        str(record.get('date', '')),
+        str(record.get('period', '')),
+        str(record.get('subsidiary', '')),
         str(record.get('account', '')),
         str(record.get('amount_debit', '')),
         str(record.get('amount_credit', '')),
-        str(record.get('document_number', '')),
-        str(record.get('approval_status', '')),
-        str(record.get('date', '')),
-        str(record.get('date_created', '')),
+        str(record.get('amount_net', '')),
+        str(record.get('amount_transaction_total', '')),
         str(record.get('class', '')),
         str(record.get('location', '')),
         str(record.get('department', '')),
-        str(record.get('memo_main', '')),
+        str(record.get('line', '')),
         str(record.get('name_line', '')),
+        str(record.get('memo_main', '')),
+        str(record.get('memo_line', '')),
+        str(record.get('status', '')),
+        str(record.get('approval_status', '')),
+        str(record.get('date_created', '')),
+        str(record.get('created_by', '')),
+        str(record.get('name', '')),
+        str(record.get('posting', '')),
+        str(record.get('company_name', ''))
     ]
 
     # Create hash from concatenated key fields
