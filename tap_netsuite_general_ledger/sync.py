@@ -3,7 +3,6 @@ Sync functionality for NetSuite GL Detail tap
 """
 
 import asyncio
-import hashlib
 from datetime import datetime, timezone
 from typing import Dict, Any
 from decimal import InvalidOperation
@@ -98,49 +97,21 @@ def format_date(date_str: str) -> str:
         return date_str
 
 
-def generate_row_id(record: Dict[str, Any]) -> str:
-    """Generate a unique row ID from key fields"""
-    # Use internal_id, line, account, and other fields to ensure uniqueness
-    # Include every field available in the record, sorted by key for consistency
-    # Hardcode all schema fields for row uniqueness, in a consistent order
-    key_fields = [
-        str(record.get('internal_id', '')),
-        str(record.get('document_number', '')),
-        str(record.get('type', '')),
-        str(record.get('journal_name', '')),
-        str(record.get('date', '')),
-        str(record.get('period', '')),
-        str(record.get('subsidiary', '')),
-        str(record.get('account', '')),
-        str(record.get('amount_debit', '')),
-        str(record.get('amount_credit', '')),
-        str(record.get('amount_net', '')),
-        str(record.get('amount_transaction_total', '')),
-        str(record.get('class', '')),
-        str(record.get('location', '')),
-        str(record.get('department', '')),
-        str(record.get('line', '')),
-        str(record.get('name_line', '')),
-        str(record.get('memo_main', '')),
-        str(record.get('memo_line', '')),
-        str(record.get('status', '')),
-        str(record.get('approval_status', '')),
-        str(record.get('date_created', '')),
-        str(record.get('created_by', '')),
-        str(record.get('name', '')),
-        str(record.get('posting', '')),
-        str(record.get('company_name', ''))
-    ]
-
-    # Create hash from concatenated key fields
-    key_string = '|'.join(key_fields)
-    row_id = hashlib.md5(key_string.encode('utf-8')).hexdigest()
-
+def generate_row_id(
+    record: Dict[str, Any], record_index: int, period: str
+) -> str:
+    """Generate a unique row ID using record position and period"""
+    # Use period and record index to ensure uniqueness
+    # Even perfect duplicates will have different positions
+    row_id = f"{period}_{record_index:08d}"
     return row_id
 
 
 def transform_record(
-    record: Dict[str, Any], client: NetSuiteClient
+    record: Dict[str, Any],
+    client: NetSuiteClient,
+    record_index: int,
+    period: str
 ) -> Dict[str, Any]:
     """Transform NetSuite record to our schema format"""
     transformed = {}
@@ -168,8 +139,8 @@ def transform_record(
         else:
             transformed[schema_field] = raw_value if raw_value else None
 
-    # Generate unique row ID
-    transformed['row_id'] = generate_row_id(transformed)
+    # Generate unique row ID using position and period
+    transformed['row_id'] = generate_row_id(transformed, record_index, period)
 
     return transformed
 
@@ -245,9 +216,18 @@ def sync_stream(
 
     # Process ALL records in one continuous stream
     record_count = 0
-    for record in records:
+    for record_index, record in enumerate(records):
         try:
-            transformed = transform_record(record, client)
+            # Extract period info from sync params for unique ID generation
+            period_info = "unknown"
+            if 'period_ids' in sync_params and sync_params['period_ids']:
+                period_info = f"pid_{sync_params['period_ids'][0]}"
+            elif 'period_names' in sync_params and sync_params['period_names']:
+                period_info = f"pname_{sync_params['period_names'][0]}"
+            
+            transformed = transform_record(
+                record, client, record_index, period_info
+            )
             
             try:
                 singer.write_record(stream_name, transformed)

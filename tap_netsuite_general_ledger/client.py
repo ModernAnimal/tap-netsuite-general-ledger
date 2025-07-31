@@ -178,8 +178,9 @@ class NetSuiteClient:
         url = (f"{self.base_url}?script={self.script_id}"
                f"&deploy={self.deploy_id}")
 
-        LOGGER.info("Making request to NetSuite API")
-        # Note: Not logging headers/payload to avoid cluttering output
+        LOGGER.info(
+            f"Making request to NetSuite API - {period_name or period_id}"
+        )
 
         # Make request with timeout
         timeout = aiohttp.ClientTimeout(total=600)  # 10 minutes
