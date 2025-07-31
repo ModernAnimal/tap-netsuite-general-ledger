@@ -32,7 +32,7 @@ FIELD_MAPPING = {
     'class': 'class',
     'location': 'location',
     'department': 'department',
-    'line': 'line',
+    'transaction_line_id': 'lineid',
     'name_line': 'entity',
     'memo_main': 'memo',
     'memo_line': 'memoline',
@@ -97,21 +97,9 @@ def format_date(date_str: str) -> str:
         return date_str
 
 
-def generate_row_id(
-    record: Dict[str, Any], record_index: int, period: str
-) -> str:
-    """Generate a unique row ID using record position and period"""
-    # Use period and record index to ensure uniqueness
-    # Even perfect duplicates will have different positions
-    row_id = f"{period}_{record_index:08d}"
-    return row_id
-
-
 def transform_record(
     record: Dict[str, Any],
-    client: NetSuiteClient,
-    record_index: int,
-    period: str
+    client: NetSuiteClient
 ) -> Dict[str, Any]:
     """Transform NetSuite record to our schema format"""
     transformed = {}
@@ -138,9 +126,6 @@ def transform_record(
             transformed[schema_field] = format_date(raw_value)
         else:
             transformed[schema_field] = raw_value if raw_value else None
-
-    # Generate unique row ID using position and period
-    transformed['row_id'] = generate_row_id(transformed, record_index, period)
 
     return transformed
 
@@ -214,7 +199,7 @@ def sync_stream(
         final_state = state.copy() if state else {}
         if 'bookmarks' not in final_state:
             final_state['bookmarks'] = {}
-        
+
         final_state['bookmarks'][stream_name] = {
             'last_sync': datetime.now(timezone.utc).isoformat(),
             'record_count': 0,
@@ -235,12 +220,12 @@ def sync_stream(
     record_count = 0
     # Write state every 100k records to match target batch size
     state_write_interval = 100000
-    
+
     # Emit initial state with sync start information
     current_state = state.copy() if state else {}
     if 'bookmarks' not in current_state:
         current_state['bookmarks'] = {}
-    
+
     current_state['bookmarks'][stream_name] = {
         'replication_method': 'FULL_TABLE',
         'sync_started': datetime.now(timezone.utc).isoformat(),
@@ -255,15 +240,8 @@ def sync_stream(
 
     for record_index, record in enumerate(records):
         try:
-            # Extract period info from sync params for unique ID generation
-            period_info = "unknown"
-            if 'period_ids' in sync_params and sync_params['period_ids']:
-                period_info = f"pid_{sync_params['period_ids'][0]}"
-            elif 'period_names' in sync_params and sync_params['period_names']:
-                period_info = f"{sync_params['period_names'][0]}"
-
             transformed = transform_record(
-                record, client, record_index, period_info
+                record, client
             )
 
             try:
@@ -282,7 +260,7 @@ def sync_stream(
             # Write state periodically and log progress
             if record_count % state_write_interval == 0:
                 LOGGER.info(f"Processed {record_count} records")
-                
+
                 # Update state with current progress in Singer format
                 progress_pct = round((record_count / len(records)) * 100, 2)
                 current_state['bookmarks'][stream_name] = {
@@ -293,7 +271,7 @@ def sync_stream(
                     'total_records': len(records),
                     'progress_percentage': progress_pct
                 }
-                
+
                 # Write state to provide checkpointing capability
                 try:
                     singer.write_state(current_state)

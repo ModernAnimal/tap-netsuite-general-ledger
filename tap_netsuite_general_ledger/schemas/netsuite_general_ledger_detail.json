@@ -62,9 +62,9 @@
       "type": ["null", "string"],
       "description": "Department"
     },
-    "line": {
+    "transaction_line_id": {
       "type": ["null", "string"],
-      "description": "Line number"
+      "description": "Transaction line ID"
     },
     "name_line": {
       "type": ["null", "string"],
