@@ -189,7 +189,8 @@ The main stream containing GL detail records. Each sync operation will:
 
 **Fields**:
 
-- `internal_id`: Internal ID of the transaction
+- `internal_id`: Internal ID of the transaction [Composite PK]
+- `transaction_line_id`: Transaction Line ID [Composite PK]
 - `document_number`: Document number
 - `type`: Transaction type
 - `journal_name`: Journal name
