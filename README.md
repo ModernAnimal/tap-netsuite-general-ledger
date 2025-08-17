@@ -46,31 +46,43 @@ The tap requires the following configuration parameters:
 - `period_ids`: List of period IDs to extract (e.g., ["123", "124", "125"])
 - `period_names`: List of period names to extract (e.g., ["Jan 2024", "Feb 2024", "Mar 2024"])
 - `batch_size`: Number of records to process per batch (default: `100000`)
+- `account_chunk_size`: Number of accounts to process per API request chunk (default: `25`)
 
 **Note**: You can specify either `period_ids` or `period_names`, but not both. Both parameters accept either a single value or a list of values. When using multiple periods, the tap will fetch data for each period and combine the results.
 
-### Memory-Optimized Processing (Always Enabled)
+### Memory-Optimized Processing with Account Chunking (Always Enabled)
 
-The tap automatically uses memory-optimized processing to handle large datasets efficiently:
+The tap automatically uses memory-optimized processing with intelligent account-based chunking to handle large datasets efficiently:
 
 ```json
 {
-  "batch_size": 100000
+  "batch_size": 100000,
+  "account_chunk_size": 25
 }
 ```
 
 Memory-optimized processing is particularly beneficial for:
 - Large datasets (100k+ records)
-- Memory-constrained environments
+- Memory-constrained environments  
+- API timeout prevention
 - Better error handling and progress tracking
 
 **Key Features:**
+- **Account-Based Chunking**: Automatically splits API requests by account chunks to prevent timeouts
 - **Period-by-Period Processing**: Processes one period at a time with full memory cleanup between periods
 - **Batch Processing**: Configurable batch sizes (default: 100,000 records)
 - **Aggressive Memory Cleanup**: Removes processed records from memory immediately
 - **Progress Tracking**: Detailed logging and state updates
+- **Fault Tolerance**: Individual chunk failures don't stop the entire process
 
-See [STREAMING.md](./STREAMING.md) for detailed documentation on memory optimization.**Note**: See `example_rolling_window_config.json` for a complete configuration template with rolling window examples.
+**Account Chunking Configuration:**
+- `account_chunk_size`: Controls how many accounts are included in each API request
+- **Default**: 25 accounts per chunk
+- **Range**: 1-100 accounts (recommended: 10-50)
+- **Automatic**: The tap automatically determines when to use chunking vs single requests
+- **Fallback**: If account retrieval fails, the tap falls back to single request mode
+
+See [STREAMING.md](./STREAMING.md) and [CHUNKING_IMPLEMENTATION.md](./CHUNKING_IMPLEMENTATION.md) for detailed documentation.**Note**: See `example_rolling_window_config.json` for a complete configuration template with rolling window examples.
 
 ### Sample Configuration
 
@@ -85,7 +97,9 @@ See [STREAMING.md](./STREAMING.md) for detailed documentation on memory optimiza
   "netsuite_script_id": "your_script_id",
   "netsuite_deploy_id": "your_deploy_id",
   "netsuite_search_id": "your_search_id",
-  "period_names": ["Jan 2024"]
+  "period_names": ["Jan 2024"],
+  "batch_size": 100000,
+  "account_chunk_size": 25
 }
 ```
 
@@ -100,7 +114,9 @@ See [STREAMING.md](./STREAMING.md) for detailed documentation on memory optimiza
   "netsuite_script_id": "your_script_id",
   "netsuite_deploy_id": "your_deploy_id",
   "netsuite_search_id": "your_search_id",
-  "period_names": ["Jan 2024", "Feb 2024", "Mar 2024"]
+  "period_names": ["Jan 2024", "Feb 2024", "Mar 2024"],
+  "batch_size": 100000,
+  "account_chunk_size": 25
 }
 ```
 
