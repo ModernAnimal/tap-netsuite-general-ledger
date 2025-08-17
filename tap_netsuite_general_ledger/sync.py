@@ -242,8 +242,7 @@ def _sync_stream_with_memory_optimization(
         batch_start_count = sync_state['total_processed']
 
         LOGGER.info(
-            f"Processing batch {batch_num}/{total_batches} "
-            f"from {period_label} ({len(batch)} records)"
+            f"Processing batch from {period_label} ({len(batch)} records)"
         )
 
         for record in batch:
@@ -270,7 +269,7 @@ def _sync_stream_with_memory_optimization(
 
         batch_processed = sync_state['total_processed'] - batch_start_count
         LOGGER.info(
-            f"Completed batch {batch_num}/{total_batches} from "
+            f"Completed batch from "
             f"{period_label}: {batch_processed} records processed"
         )
 
