@@ -36,6 +36,7 @@ class NetSuiteClient:
         self.script_id = config.get("netsuite_script_id")
         self.deploy_id = config.get("netsuite_deploy_id")
         self.search_id = config.get("netsuite_search_id")
+        self.account_chunk_size = config.get("account_chunk_size", 25)
 
         # Build base URL
         self.base_url = (
@@ -116,7 +117,7 @@ class NetSuiteClient:
         period_ids: Optional[List[str]] = None,
         period_names: Optional[List[str]] = None
     ) -> int:
-        """Fetch GL detail data from NetSuite with true streaming processing
+        """Fetch GL data from NetSuite with chunking and streaming processing
 
         Args:
             batch_callback: Async function to call with each batch of records
@@ -165,8 +166,269 @@ class NetSuiteClient:
         period_id: Optional[str] = None,
         period_name: Optional[str] = None
     ) -> int:
-        """Fetch GL data for a single period with streaming processing"""
+        """Fetch GL data for a single period with account chunking"""
 
+        if period_id:
+            period_label = f"period ID: {period_id}"
+        elif period_name:
+            period_label = f"period name: {period_name}"
+        else:
+            period_label = "default period"
+
+        LOGGER.info(f"Starting chunked fetch for {period_label}")
+        
+        # Try to get accounts for chunking
+        try:
+            accounts = await self._get_accounts()
+            if accounts and len(accounts) > self.account_chunk_size:
+                LOGGER.info(
+                    f"Using account-based chunking: {len(accounts)} accounts "
+                    f"in chunks of {self.account_chunk_size}"
+                )
+                return await self._fetch_with_account_chunks(
+                    accounts, batch_callback, batch_size,
+                    period_id, period_name, period_label
+                )
+            else:
+                LOGGER.info(
+                    f"Using single request "
+                    f"(accounts: {len(accounts) if accounts else 'unknown'})"
+                )
+        except Exception as e:
+            LOGGER.warning(f"Could not get accounts for chunking: {e}")
+            LOGGER.info("Falling back to single request")
+
+        # Fallback to single request
+        return await self._fetch_single_request(
+            batch_callback, batch_size, period_id, period_name, period_label
+        )
+
+    async def _get_accounts(self) -> Optional[List[Dict[str, Any]]]:
+        """Get list of all accounts from NetSuite for chunking"""
+        
+        request_data = {'action': 'getAccounts'}
+        
+        try:
+            result = await self._make_api_request(request_data)
+            if result.get('success') and 'results' in result:
+                accounts = result['results']
+                LOGGER.info(f"Retrieved {len(accounts)} accounts for chunking")
+                return accounts
+            else:
+                LOGGER.warning(
+                    f"Failed to get accounts: "
+                    f"{result.get('error', 'Unknown error')}"
+                )
+                return None
+        except Exception as e:
+            LOGGER.warning(f"Error getting accounts: {e}")
+            return None
+
+    async def _fetch_with_account_chunks(
+        self,
+        accounts: List[Dict[str, Any]],
+        batch_callback,
+        batch_size: int,
+        period_id: Optional[str],
+        period_name: Optional[str],
+        period_label: str
+    ) -> int:
+        """Fetch GL data using account-based chunking"""
+        
+        # Create account chunks
+        account_chunks = []
+        for i in range(0, len(accounts), self.account_chunk_size):
+            chunk = accounts[i:i + self.account_chunk_size]
+            account_ids = [acc['id'] for acc in chunk if acc.get('id')]
+            
+            if account_ids:  # Only add chunks with valid account IDs
+                end_account = min(i+self.account_chunk_size, len(accounts))
+                account_chunks.append({
+                    'ids': account_ids,
+                    'description': f"Accounts {i+1}-{end_account}"
+                })
+
+        if not account_chunks:
+            LOGGER.warning(
+                "No valid account chunks created, using single request"
+            )
+            return await self._fetch_single_request(
+                batch_callback, batch_size, period_id,
+                period_name, period_label
+            )
+
+        LOGGER.info(
+            f"Split {len(accounts)} accounts into {len(account_chunks)} "
+            f"chunks of {self.account_chunk_size}"
+        )
+
+        # Process each chunk with pagination support
+        total_processed = 0
+        
+        for chunk_num, chunk in enumerate(account_chunks, 1):
+            LOGGER.info(
+                f"Processing chunk {chunk_num}/{len(account_chunks)}: "
+                f"{chunk['description']}"
+            )
+            
+            try:
+                chunk_records = await self._fetch_chunk_data(
+                    chunk['ids'], period_id, period_name, period_label
+                )
+                
+                if chunk_records:
+                    # Process records in batches
+                    processed = await (
+                        self._process_records_in_streaming_batches(
+                            chunk_records, batch_callback, batch_size,
+                            f"{period_label} - {chunk['description']}"
+                        )
+                    )
+                    total_processed += processed
+                    
+                    LOGGER.info(
+                        f"Chunk {chunk_num} completed: {processed} "
+                        f"records processed"
+                    )
+                else:
+                    LOGGER.info(f"Chunk {chunk_num}: No records found")
+                
+                # Small delay between chunks to avoid overwhelming the API
+                await asyncio.sleep(1)  # Match smart export delay
+                
+            except Exception as e:
+                LOGGER.error(f"Chunk {chunk_num} failed: {str(e)}")
+                # Continue with other chunks
+                continue
+
+        LOGGER.info(
+            f"Account chunking completed: {total_processed} total records"
+        )
+        return total_processed
+
+    async def _fetch_chunk_data(
+        self,
+        account_ids: List[str],
+        period_id: Optional[str],
+        period_name: Optional[str],
+        period_label: str
+    ) -> List[Dict[str, Any]]:
+        """Fetch data for a specific chunk of accounts with pagination"""
+        
+        # Build base request payload
+        request_data = {'searchID': self.search_id}
+        
+        if period_id:
+            request_data['periodId'] = period_id
+        elif period_name:
+            request_data['periodName'] = period_name
+            
+        # Add account filter and pagination settings
+        request_data['accountIds'] = account_ids
+        request_data['maxResults'] = 50000  # Match smart export limit
+        request_data['startIndex'] = 0
+        
+        # Handle pagination for large chunks
+        chunk_records = []
+        start_index = 0
+        page_num = 1
+        
+        while True:
+            try:
+                request_data['startIndex'] = start_index
+                
+                LOGGER.debug(
+                    f"Fetching page {page_num} for accounts "
+                    f"(startIndex: {start_index})"
+                )
+                
+                result = await self._make_api_request(request_data)
+                
+                if result.get('success') and 'results' in result:
+                    page_records = result['results']
+                    chunk_records.extend(page_records)
+                    
+                    LOGGER.info(
+                        f"   Page {page_num}: {len(page_records)} records"
+                    )
+                    
+                    # Check if there are more results
+                    if (result.get('hasMoreResults') and
+                            result.get('nextStartIndex')):
+                        start_index = result['nextStartIndex']
+                        page_num += 1
+                        await asyncio.sleep(0.5)  # Small delay between pages
+                    else:
+                        break
+                else:
+                    error_msg = result.get('error', 'Unknown error')
+                    LOGGER.warning(f"Page {page_num} failed: {error_msg}")
+                    break
+                    
+            except Exception as e:
+                LOGGER.error(f"Error fetching page {page_num}: {e}")
+                break
+        
+        if chunk_records:
+            LOGGER.info(
+                f"Retrieved {len(chunk_records)} total records "
+                f"({page_num} pages) for chunk"
+            )
+        else:
+            LOGGER.warning("No records retrieved for chunk")
+        
+        return chunk_records
+
+    async def _fetch_single_request(
+        self,
+        batch_callback,
+        batch_size: int,
+        period_id: Optional[str],
+        period_name: Optional[str],
+        period_label: str
+    ) -> int:
+        """Fetch data using a single API request (fallback)"""
+        
+        # Build request payload
+        request_data = {'searchID': self.search_id}
+        
+        if period_id:
+            request_data['periodId'] = period_id
+        elif period_name:
+            request_data['periodName'] = period_name
+
+        LOGGER.info(f"Making single API request for {period_label}")
+
+        try:
+            result = await self._make_api_request(request_data)
+            
+            if result.get('success') and 'results' in result:
+                records = result['results']
+                total_records = len(records)
+                
+                LOGGER.info(
+                    f"Successfully retrieved {total_records} records for "
+                    f"{period_label}"
+                )
+                
+                # Process records immediately with memory cleanup
+                return await self._process_records_in_streaming_batches(
+                    records, batch_callback, batch_size, period_label
+                )
+            else:
+                error_msg = result.get('error', 'Unknown error')
+                LOGGER.error(f"NetSuite API error: {error_msg}")
+                raise Exception(f"NetSuite API error: {error_msg}")
+                
+        except Exception as e:
+            LOGGER.error(f"Error in single request: {str(e)}")
+            raise
+
+    async def _make_api_request(
+        self, request_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Make a request to the NetSuite API"""
+        
         # Prepare request headers
         headers = {
             'Authorization': self.generate_oauth_header(),
@@ -174,27 +436,11 @@ class NetSuiteClient:
             'Accept': 'application/json'
         }
 
-        # Build request payload
-        request_data = {'searchID': self.search_id}
-
-        if period_id:
-            request_data['periodId'] = period_id
-            period_label = f"period ID: {period_id}"
-        elif period_name:
-            request_data['periodName'] = period_name
-            period_label = f"period name: {period_name}"
-        else:
-            period_label = "default period"
-
         # Build request URL
         url = (f"{self.base_url}?script={self.script_id}"
                f"&deploy={self.deploy_id}")
 
-        LOGGER.info(
-            f"Making streaming request to NetSuite API - {period_label}"
-        )
-
-        # Make request with streaming JSON processing
+        # Make request with timeout
         timeout = aiohttp.ClientTimeout(total=600)  # 10 minutes
         async with aiohttp.ClientSession(timeout=timeout) as session:
             try:
@@ -204,61 +450,22 @@ class NetSuiteClient:
                     json=request_data
                 ) as response:
                     if response.status == 200:
-                        # Process the response with streaming JSON parsing
-                        return await self._process_streaming_response(
-                            response, batch_callback, batch_size, period_label
-                        )
+                        result = await response.json()
+                        LOGGER.debug("NetSuite API request successful")
+                        return result
                     else:
                         error_text = await response.text()
                         LOGGER.error(f"HTTP {response.status}: {error_text}")
-                        raise Exception(
-                            f"HTTP {response.status}: {error_text}"
-                        )
+                        return {
+                            'success': False,
+                            'error': f"HTTP {response.status}: {error_text}"
+                        }
             except asyncio.TimeoutError:
                 LOGGER.error("Request timed out after 10 minutes")
-                raise Exception("Request timed out")
+                return {'success': False, 'error': 'Request timed out'}
             except Exception as e:
                 LOGGER.error(f"Request failed: {str(e)}")
-                raise
-
-    async def _process_streaming_response(
-        self,
-        response,
-        batch_callback,
-        batch_size: int,
-        period_label: str
-    ) -> int:
-        """Process streaming JSON response to minimize memory usage"""
-
-        # Unfortunately, aiohttp doesn't support streaming JSON parsing
-        # The NetSuite API returns all data in one JSON response
-        # But we can process it immediately with aggressive memory cleanup
-
-        try:
-            result = await response.json()
-            LOGGER.info("NetSuite API request successful")
-
-            if result.get('success') and 'results' in result:
-                records = result['results']
-                total_records = len(records)
-
-                LOGGER.info(
-                    f"Successfully retrieved {total_records} records for "
-                    f"{period_label}"
-                )
-
-                # Process records immediately with memory cleanup
-                return await self._process_records_in_streaming_batches(
-                    records, batch_callback, batch_size, period_label
-                )
-            else:
-                error_msg = result.get('error', 'Unknown error')
-                LOGGER.error(f"NetSuite API error: {error_msg}")
-                raise Exception(f"NetSuite API error: {error_msg}")
-
-        except Exception as e:
-            LOGGER.error(f"Error processing streaming response: {str(e)}")
-            raise
+                return {'success': False, 'error': str(e)}
 
     async def _process_records_in_streaming_batches(
         self,
@@ -328,73 +535,6 @@ class NetSuiteClient:
             f"{period_label}"
         )
         return processed_count
-
-    async def _fetch_single_period(
-        self,
-        period_id: Optional[str] = None,
-        period_name: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
-        """Fetch GL detail data for a single period from NetSuite"""
-
-        # Prepare request headers
-        headers = {
-            'Authorization': self.generate_oauth_header(),
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        }
-
-        # Build request payload
-        request_data = {'searchID': self.search_id}
-
-        if period_id:
-            request_data['periodId'] = period_id
-        elif period_name:
-            request_data['periodName'] = period_name
-
-        # Build request URL
-        url = (f"{self.base_url}?script={self.script_id}"
-               f"&deploy={self.deploy_id}")
-
-        LOGGER.info(
-            f"Making request to NetSuite API - {period_name or period_id}"
-        )
-
-        # Make request with timeout
-        timeout = aiohttp.ClientTimeout(total=600)  # 10 minutes
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            try:
-                async with session.post(
-                    url,
-                    headers=headers,
-                    json=request_data
-                ) as response:
-                    if response.status == 200:
-                        result = await response.json()
-                        # Don't log full API response - it can be massive
-                        LOGGER.info("NetSuite API request successful")
-                        if result.get('success') and 'results' in result:
-                            records = result['results']
-                            LOGGER.info(
-                                f"Successfully retrieved {len(records)} "
-                                f"records"
-                            )
-                            return records
-                        else:
-                            error_msg = result.get('error', 'Unknown error')
-                            LOGGER.error(f"NetSuite API error: {error_msg}")
-                            raise Exception(f"NetSuite API error: {error_msg}")
-                    else:
-                        error_text = await response.text()
-                        LOGGER.error(f"HTTP {response.status}: {error_text}")
-                        raise Exception(
-                            f"HTTP {response.status}: {error_text}"
-                        )
-            except asyncio.TimeoutError:
-                LOGGER.error("Request timed out after 10 minutes")
-                raise Exception("Request timed out")
-            except Exception as e:
-                LOGGER.error(f"Request failed: {str(e)}")
-                raise
 
     def extract_field_value(
         self, record: Dict[str, Any], field_name: str
