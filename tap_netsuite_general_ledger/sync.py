@@ -58,12 +58,17 @@ def convert_to_integer(value: Any) -> Any:
 
 
 def format_date(date_str: Any) -> str:
-    """Format date string to ISO format"""
+    """Format date string to ISO format (YYYY-MM-DD)"""
     if not date_str or date_str == '':
         return None
 
-    # If already a string in ISO format, return as-is
+    # If already a string, try to parse and format it
     if isinstance(date_str, str):
+        # Check if already in ISO format
+        if len(date_str) >= 10 and date_str[4] == '-' and date_str[7] == '-':
+            # Already in YYYY-MM-DD format (or YYYY-MM-DD HH:MM:SS)
+            return date_str[:10]
+        
         try:
             # Common NetSuite date formats
             formats = [
@@ -81,12 +86,15 @@ def format_date(date_str: Any) -> str:
                 except ValueError:
                     continue
 
-            # If no format matches, return as-is
-            return date_str
+            # If no format matches, log and return None
+            LOGGER.warning(f"Unable to parse date: {date_str}")
+            return None
 
         except Exception as e:
-            LOGGER.warning(f"Date formatting error: {str(e)}")
-            return date_str
+            LOGGER.warning(
+                f"Date formatting error: {str(e)} for value: {date_str}"
+            )
+            return None
 
     return None
 
@@ -97,14 +105,21 @@ def format_datetime(datetime_str: Any) -> str:
         return None
 
     if isinstance(datetime_str, str):
+        # Check if already in ISO format with Z
+        if 'T' in datetime_str:
+            # Already in ISO format (e.g., 2025-03-17T14:30:00Z)
+            if datetime_str.endswith('Z'):
+                return datetime_str
+            else:
+                return datetime_str + 'Z'
+        
         try:
             # Common NetSuite datetime formats
             formats = [
+                '%Y-%m-%d %H:%M:%S',   # 2025-03-17 14:30:00
                 '%m/%d/%Y %I:%M %p',   # 5/17/2025 4:04 am
-                '%m/%d/%Y %H:%M:%S',
-                '%Y-%m-%d %H:%M:%S',
-                '%Y-%m-%dT%H:%M:%S',
-                '%Y-%m-%dT%H:%M:%SZ',
+                '%m/%d/%Y %H:%M:%S',   # 5/17/2025 16:04:00
+                '%Y-%m-%dT%H:%M:%S',   # 2025-03-17T14:30:00
             ]
 
             for fmt in formats:
@@ -114,12 +129,16 @@ def format_datetime(datetime_str: Any) -> str:
                 except ValueError:
                     continue
 
-            # If no format matches, return as-is
-            return datetime_str
+            # If no format matches, log and return None
+            LOGGER.warning(f"Unable to parse datetime: {datetime_str}")
+            return None
 
         except Exception as e:
-            LOGGER.warning(f"Datetime formatting error: {str(e)}")
-            return datetime_str
+            LOGGER.warning(
+                f"Datetime formatting error: {str(e)} "
+                f"for value: {datetime_str}"
+            )
+            return None
 
     return None
 

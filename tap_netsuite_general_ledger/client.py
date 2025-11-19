@@ -139,7 +139,7 @@ class NetSuiteClient:
             t.tranID AS tran_id,
             BUILTIN.DF(t.type) AS transaction_type,
             t.tranDate AS tran_date,
-            tal.TransactionLine AS transAcctLineID,
+            tal.ID AS transAcctLineID,
             tal.Account AS acctID,
             a.acctnumber AS account_number,
             a.acctname AS account_name,
