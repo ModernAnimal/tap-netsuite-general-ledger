@@ -128,49 +128,50 @@ class NetSuiteClient:
         Returns:
             SuiteQL query string
         """
-        # Base query with all fields
-        # Note: TransactionAccountingLine has debit/credit/account
-        #       TransactionLine has department/class/location/memo
+        # Base query with all fields from original demo
+        # Note: TransactionAccountingLine (tal) has debit/credit/account
+        #       TransactionLine (tl) has department/class/location/memo
         query = """
         SELECT
-            BUILTIN.DF(t.postingPeriod) AS posting_period,
-            t.postingPeriod AS posting_period_id,
+            BUILTIN.DF(t.PostingPeriod) AS posting_period,
+            t.PostingPeriod AS posting_period_id,
+            t.createdDateTime AS created_date,
+            tal.lastmodifieddate AS last_modified,
+            t.Posting AS posting,
+            BUILTIN.DF(t.approvalStatus) AS approval,
+            t.Trandate AS transaction_date,
+            t.TranID AS transaction_id,
+            tal.ID AS trans_acct_line_id,
             t.ID AS internalid,
-            t.tranID AS tran_id,
-            BUILTIN.DF(t.type) AS transaction_type,
-            t.tranDate AS tran_date,
-            tal.ID AS transAcctLineID,
-            tal.Account AS acctID,
-            a.acctnumber AS account_number,
-            a.acctname AS account_name,
-            tal.Amount AS net_amount,
+            BUILTIN.DF(t.Entity) AS entity_name,
+            t.memo AS trans_memo,
+            tl.memo AS trans_line_memo,
+            BUILTIN.DF(t.Type) AS transaction_type,
+            tal.Account AS acct_id,
+            a.parent AS account_group,
+            tl.Department AS department,
+            tl.Class AS class,
+            tl.Location AS location,
             tal.Debit AS debit,
             tal.Credit AS credit,
-            tl.memo AS memo,
-            a.accttype AS account_type,
-            d.name AS department_name,
-            c.name AS class_name,
-            l.name AS location_name,
-            t.entity AS entity_id,
-            BUILTIN.DF(t.entity) AS entity_name,
-            t.subsidiary AS subsidiary_id,
-            BUILTIN.DF(t.subsidiary) AS subsidiary_name,
-            BUILTIN.DF(t.currency) AS currency,
-            t.lastModifiedDate AS lastmodified,
-            a.id AS account_internalid
+            tal.Amount AS net_amount,
+            BUILTIN.DF(tl.Subsidiary) AS subsidiary,
+            t.Number AS document_number,
+            BUILTIN.DF(t.Status) AS status
         FROM
-            transaction t
-        INNER JOIN TransactionAccountingLine tal ON tal.Transaction = t.ID
-        LEFT JOIN account a ON a.ID = tal.Account
+            Transaction t
+        INNER JOIN TransactionAccountingLine tal ON (
+            tal.Transaction = t.ID
+        )
+        INNER JOIN Account a ON (
+            a.ID = tal.Account
+        )
         LEFT JOIN TransactionLine tl ON (
             tl.transaction = t.ID
             AND tl.id = tal.TransactionLine
         )
-        LEFT JOIN department d ON tl.department = d.id
-        LEFT JOIN classification c ON tl.class = c.id
-        LEFT JOIN location l ON tl.location = l.id
         WHERE
-            t.postingPeriod IS NOT NULL
+            t.PostingPeriod IS NOT NULL
             AND tal.Account IS NOT NULL
         """
 

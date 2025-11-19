@@ -155,10 +155,9 @@ def transform_record(
 
     # String fields - use as-is or convert to string
     string_fields = [
-        'posting_period', 'tran_id', 'transaction_type',
-        'account_number', 'account_name', 'memo', 'account_type',
-        'department_name', 'class_name', 'location_name',
-        'entity_name', 'subsidiary_name', 'currency'
+        'posting_period', 'posting', 'approval', 'transaction_id',
+        'entity_name', 'trans_memo', 'trans_line_memo', 'transaction_type',
+        'subsidiary', 'document_number', 'status'
     ]
     for field in string_fields:
         value = record.get(field)
@@ -170,8 +169,8 @@ def transform_record(
 
     # Integer fields
     integer_fields = [
-        'posting_period_id', 'internalid', 'transAcctLineID',
-        'acctID', 'entity_id', 'subsidiary_id', 'account_internalid'
+        'posting_period_id', 'trans_acct_line_id', 'internalid',
+        'acct_id', 'account_group', 'department', 'class', 'location'
     ]
     for field in integer_fields:
         transformed[field] = convert_to_integer(record.get(field))
@@ -182,10 +181,13 @@ def transform_record(
         transformed[field] = convert_to_number(record.get(field))
 
     # Date fields
-    transformed['tran_date'] = format_date(record.get('tran_date'))
+    transformed['transaction_date'] = format_date(
+        record.get('transaction_date')
+    )
 
     # Datetime fields
-    transformed['lastmodified'] = format_datetime(record.get('lastmodified'))
+    transformed['created_date'] = format_datetime(record.get('created_date'))
+    transformed['last_modified'] = format_datetime(record.get('last_modified'))
 
     return transformed
 
