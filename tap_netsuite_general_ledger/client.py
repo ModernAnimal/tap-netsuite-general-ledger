@@ -141,7 +141,7 @@ class NetSuiteClient:
             BUILTIN.DF(t.approvalStatus) AS approval,
             t.Trandate AS transaction_date,
             t.TranID AS transaction_id,
-            tal.ID AS trans_acct_line_id,
+            tal.TransactionLine AS trans_acct_line_id,
             t.ID AS internalid,
             BUILTIN.DF(t.Entity) AS entity_name,
             t.memo AS trans_memo,
@@ -173,6 +173,7 @@ class NetSuiteClient:
         WHERE
             t.PostingPeriod IS NOT NULL
             AND tal.Account IS NOT NULL
+            AND tal.TransactionLine IS NOT NULL
         """
 
         # Add ID filter if chunking (to handle offset limit)
