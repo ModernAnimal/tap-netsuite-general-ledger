@@ -1,111 +1,107 @@
 {
   "type": "object",
   "properties": {
-    "internal_id": {
+    "posting_period": {
       "type": ["null", "string"],
+      "description": "Posting period name (display format)"
+    },
+    "posting_period_id": {
+      "type": ["null", "integer"],
+      "description": "Posting period internal ID"
+    },
+    "internalid": {
+      "type": ["null", "integer"],
       "description": "Internal ID of the transaction"
     },
-    "document_number": {
+    "tran_id": {
       "type": ["null", "string"],
-      "description": "Document number"
+      "description": "Transaction ID"
     },
-    "type": {
+    "transaction_type": {
       "type": ["null", "string"],
-      "description": "Transaction type"
+      "description": "Transaction type (display format)"
     },
-    "journal_name": {
+    "tran_date": {
       "type": ["null", "string"],
-      "description": "Journal name"
-    },
-    "date": {
-      "type": ["null", "string"],
-      "format": "date-time",
+      "format": "date",
       "description": "Transaction date"
     },
-    "period": {
+    "transAcctLineID": {
+      "type": ["null", "integer"],
+      "description": "Transaction line ID"
+    },
+    "acctID": {
+      "type": ["null", "integer"],
+      "description": "Account internal ID"
+    },
+    "account_number": {
       "type": ["null", "string"],
-      "description": "Posting period"
+      "description": "Account number"
     },
-    "subsidiary": {
+    "account_name": {
       "type": ["null", "string"],
-      "description": "Subsidiary"
+      "description": "Account name"
     },
-    "account": {
-      "type": ["null", "string"],
-      "description": "Account"
-    },
-    "amount_debit": {
-      "type": ["null", "number"],
-      "description": "Debit amount"
-    },
-    "amount_credit": {
-      "type": ["null", "number"],
-      "description": "Credit amount"
-    },
-    "amount_net": {
+    "net_amount": {
       "type": ["null", "number"],
       "description": "Net amount"
     },
-    "amount_transaction_total": {
+    "debit": {
       "type": ["null", "number"],
-      "description": "Transaction total amount"
+      "description": "Debit amount"
     },
-    "class": {
+    "credit": {
+      "type": ["null", "number"],
+      "description": "Credit amount"
+    },
+    "memo": {
       "type": ["null", "string"],
-      "description": "Class"
+      "description": "Transaction line memo"
     },
-    "location": {
+    "account_type": {
       "type": ["null", "string"],
-      "description": "Location"
+      "description": "Account type"
     },
-    "department": {
+    "department_name": {
       "type": ["null", "string"],
-      "description": "Department"
+      "description": "Department name"
     },
-    "name_line": {
+    "class_name": {
       "type": ["null", "string"],
-      "description": "Name (Line)"
+      "description": "Class name"
     },
-    "memo_main": {
+    "location_name": {
       "type": ["null", "string"],
-      "description": "Main memo"
+      "description": "Location name"
     },
-    "memo_line": {
+    "entity_id": {
+      "type": ["null", "integer"],
+      "description": "Entity internal ID"
+    },
+    "entity_name": {
       "type": ["null", "string"],
-      "description": "Line memo"
+      "description": "Entity name (display format)"
     },
-    "status": {
+    "subsidiary_id": {
+      "type": ["null", "integer"],
+      "description": "Subsidiary internal ID"
+    },
+    "subsidiary_name": {
       "type": ["null", "string"],
-      "description": "Status"
+      "description": "Subsidiary name (display format)"
     },
-    "approval_status": {
+    "currency": {
       "type": ["null", "string"],
-      "description": "Approval status"
+      "description": "Currency (display format)"
     },
-    "date_created": {
+    "lastmodified": {
       "type": ["null", "string"],
       "format": "date-time",
-      "description": "Date created"
+      "description": "Last modified date"
     },
-    "created_by": {
-      "type": ["null", "string"],
-      "description": "Created by"
-    },
-    "name": {
-      "type": ["null", "string"],
-      "description": "Name"
-    },
-    "posting": {
-      "type": ["null", "string"],
-      "description": "Posting"
-    },
-    "company_name": {
-      "type": ["null", "string"],
-      "description": "Company name"
-    },
-    "transaction_line_id": {
-      "type": ["null", "string"],
-      "description": "Transaction line ID"
+    "account_internalid": {
+      "type": ["null", "integer"],
+      "description": "Account internal ID (duplicate for compatibility)"
     }
   }
 }

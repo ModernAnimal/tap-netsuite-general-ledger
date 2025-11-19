@@ -1,16 +1,10 @@
 # tap-netsuite-general-ledger
 
-A [Singer](https://www.singer.io/) tap for extracting NetSuite General Ledger Detail.
+A [Singer](https://www.singer.io/) tap for extracting NetSuite General Ledger Detail using SuiteQL.
 
 ## Overview
 
-This tap extracts GL Detail data from NetSuite via a RESTlet API using OAuth 1.0a authentication. It's designed to work with a specific NetSuite saved search and RESTlet configuration.
-
-**Important**: This tap performs a **FULL REFRESH** for each sync operation (to allow for potential deletions), which means:
-- The target table is **TRUNCATED** before loading new data
-- All data for the specified date range/period is completely reloaded
-- This approach ensures any deletions or modifications in NetSuite are properly reflected in the target
-- Ideal for rolling window scenarios where you want to refresh data for specific time periods
+This tap extracts GL Detail data from NetSuite via the SuiteQL REST API using OAuth 1.0a authentication. It supports both full refresh and incremental sync modes based on the `lastmodified` field.
 
 ## Installation
 
@@ -28,8 +22,6 @@ pip install -e .
 
 ## Configuration
 
-The tap requires the following configuration parameters:
-
 ### Required Configuration
 
 - `netsuite_account`: Your NetSuite account ID
@@ -37,120 +29,39 @@ The tap requires the following configuration parameters:
 - `netsuite_consumer_secret`: OAuth consumer secret  
 - `netsuite_token_id`: OAuth token ID
 - `netsuite_token_secret`: OAuth token secret
-- `netsuite_script_id`: RESTlet script ID
-- `netsuite_deploy_id`: RESTlet deployment ID
-- `netsuite_search_id`: Saved search ID
 
 ### Optional Configuration
 
-- `period_ids`: List of period IDs to extract (e.g., ["123", "124", "125"])
-- `period_names`: List of period names to extract (e.g., ["Jan 2024", "Feb 2024", "Mar 2024"])
+- `last_modified_date`: Date for incremental sync (format: `YYYY-MM-DD`). If not provided, performs full refresh.
+- `page_size`: Number of records to fetch per API request (default: `5000`)
 - `batch_size`: Number of records to process per batch (default: `100000`)
-- `account_chunk_size`: Number of accounts to process per API request chunk (default: `25`)
-
-**Note**: You can specify either `period_ids` or `period_names`, but not both. Both parameters accept either a single value or a list of values. When using multiple periods, the tap will fetch data for each period and combine the results.
-
-### Memory-Optimized Processing with Account Chunking (Always Enabled)
-
-The tap automatically uses memory-optimized processing with intelligent account-based chunking to handle large datasets efficiently:
-
-```json
-{
-  "batch_size": 100000,
-  "account_chunk_size": 25
-}
-```
-
-Memory-optimized processing is particularly beneficial for:
-- Large datasets (100k+ records)
-- Memory-constrained environments  
-- API timeout prevention
-- Better error handling and progress tracking
-
-**Key Features:**
-- **Account-Based Chunking**: Automatically splits API requests by account chunks to prevent timeouts
-- **Period-by-Period Processing**: Processes one period at a time with full memory cleanup between periods
-- **Batch Processing**: Configurable batch sizes (default: 100,000 records)
-- **Aggressive Memory Cleanup**: Removes processed records from memory immediately
-- **Progress Tracking**: Detailed logging and state updates
-- **Fault Tolerance**: Individual chunk failures don't stop the entire process
-
-**Account Chunking Configuration:**
-- `account_chunk_size`: Controls how many accounts are included in each API request
-- **Default**: 25 accounts per chunk
-- **Range**: 1-100 accounts (recommended: 10-50)
-- **Automatic**: The tap automatically determines when to use chunking vs single requests
-- **Fallback**: If account retrieval fails, the tap falls back to single request mode
-
-See [STREAMING.md](./STREAMING.md) and [CHUNKING_IMPLEMENTATION.md](./CHUNKING_IMPLEMENTATION.md) for detailed documentation.**Note**: See `example_rolling_window_config.json` for a complete configuration template with rolling window examples.
 
 ### Sample Configuration
 
-**Single period:**
+**Full Refresh (all data):**
 ```json
 {
-  "netsuite_account": "your_account_id",
+  "netsuite_account": "5665960",
   "netsuite_consumer_key": "your_consumer_key",
   "netsuite_consumer_secret": "your_consumer_secret",
   "netsuite_token_id": "your_token_id",
   "netsuite_token_secret": "your_token_secret",
-  "netsuite_script_id": "your_script_id",
-  "netsuite_deploy_id": "your_deploy_id",
-  "netsuite_search_id": "your_search_id",
-  "period_names": ["Jan 2024"],
-  "batch_size": 100000,
-  "account_chunk_size": 25
+  "page_size": 5000,
+  "batch_size": 100000
 }
 ```
 
-**Multiple periods:**
+**Incremental Sync (modified records only):**
 ```json
 {
-  "netsuite_account": "your_account_id",
+  "netsuite_account": "5665960",
   "netsuite_consumer_key": "your_consumer_key",
   "netsuite_consumer_secret": "your_consumer_secret",
   "netsuite_token_id": "your_token_id",
   "netsuite_token_secret": "your_token_secret",
-  "netsuite_script_id": "your_script_id",
-  "netsuite_deploy_id": "your_deploy_id",
-  "netsuite_search_id": "your_search_id",
-  "period_names": ["Jan 2024", "Feb 2024", "Mar 2024"],
-  "batch_size": 100000,
-  "account_chunk_size": 25
-}
-```
-
-### Rolling Window Configuration Examples
-
-**Monthly refresh for January 2024:**
-```json
-{
-  "period_names": ["Jan 2024"],
-  ...other config...
-}
-```
-
-**Quarterly refresh using period ID:**
-```json
-{
-  "period_ids": ["123"],
-  ...other config...
-}
-```
-
-**Multiple months refresh:**
-```json
-{
-  "period_names": ["Jan 2024", "Feb 2024", "Mar 2024"],
-  ...other config...
-}
-```
-
-**Multiple periods using IDs:**
-```json
-{
-  "period_ids": ["123", "124", "125"],
-  ...other config...
+  "last_modified_date": "2025-03-01",
+  "page_size": 5000,
+  "batch_size": 100000
 }
 ```
 
@@ -164,120 +75,108 @@ Generate a catalog of available streams:
 tap-netsuite-general-ledger --config config.json --discover > catalog.json
 ```
 
-### Sync Mode (Full Refresh)
+### Sync Mode
 
-Extract data using the catalog. **Note**: This will TRUNCATE the target table and reload all data for the specified date range:
+Extract data using the catalog:
 
 ```bash
 tap-netsuite-general-ledger --config config.json --catalog catalog.json
 ```
 
-### Rolling Window Example
-
-For a rolling window approach where you refresh data for specific periods:
-
-```bash
-# Refresh data for January 2024 (truncates and reloads)
-tap-netsuite-general-ledger --config config_jan_2024.json --catalog catalog.json
-
-# Refresh data for February 2024 (truncates and reloads)
-tap-netsuite-general-ledger --config config_feb_2024.json --catalog catalog.json
-```
-
-### With State
-
-State is maintained for tracking sync history, but does not affect the full refresh behavior:
+### With State (for incremental syncs)
 
 ```bash
 tap-netsuite-general-ledger --config config.json --catalog catalog.json --state state.json
 ```
 
+## Sync Modes
+
+### Full Refresh
+When `last_modified_date` is not provided, the tap fetches all GL transactions that meet the posting criteria.
+
+### Incremental Sync
+When `last_modified_date` is provided, the tap only fetches records where `tal.lastmodifieddate >= last_modified_date`. This is ideal for:
+- Regular scheduled syncs
+- Reducing data transfer
+- Capturing recent changes only
+
 ## Streams
 
 ### netsuite_general_ledger_detail
 
-**Replication Method**: `FULL_TABLE` (Full Refresh with Truncate)
+**Key Properties**: `internalid`, `transAcctLineID`
 
-The main stream containing GL detail records. Each sync operation will:
-1. **TRUNCATE** the target table
-2. **RELOAD** all data for the specified date range/period
-3. Ensure data consistency and account for any deletions in NetSuite
+**Replication Method**: `FULL_TABLE` or `INCREMENTAL` (based on `last_modified_date`)
 
 **Fields**:
 
-- `internal_id`: Internal ID of the transaction [Composite PK]
-- `transaction_line_id`: Transaction Line ID [Composite PK]
-- `document_number`: Document number
-- `type`: Transaction type
-- `journal_name`: Journal name
-- `date`: Transaction date
-- `period`: Posting period
+- `posting_period`: Posting period name
+- `postingPeriodID`: Posting period ID
+- `createdDate`: Date created (datetime)
+- `lastmodified`: Last modified date (datetime)
+- `posting`: Posting flag
+- `approval`: Approval status
+- `transaction_date`: Transaction date
+- `transactionid`: Transaction ID
+- `transAcctLineID`: Transaction accounting line ID
+- `internalid`: Internal ID of the transaction
+- `entity_name`: Entity name
+- `transmemo`: Transaction memo
+- `translineMemo`: Transaction line memo
+- `transaction_type`: Transaction type
+- `acctID`: Account ID
+- `accountgroup`: Account group (parent account)
+- `department`: Department ID
+- `class`: Class ID
+- `location`: Location ID
+- `debit`: Debit amount
+- `credit`: Credit amount
+- `net_amount`: Net amount
 - `subsidiary`: Subsidiary
-- `account`: Account
-- `amount_debit`: Debit amount
-- `amount_credit`: Credit amount
-- `amount_net`: Net amount
-- `amount_transaction_total`: Transaction total amount
-- `class`: Class
-- `location`: Location
-- `department`: Department
-- `line`: Line number
-- `name_line`: Line name
-- `memo_main`: Main memo
-- `memo_line`: Line memo
+- `document_number`: Document number
 - `status`: Status
-- `approval_status`: Approval status
-- `date_created`: Date created
-- `created_by`: Created by
-- `name`: Name
-- `posting`: Posting
-- `company_name`: Company name
 
-## Full Refresh Behavior
+## SuiteQL Query
 
-This tap is specifically designed for **FULL REFRESH** replication to ensure data integrity:
+The tap executes a SuiteQL query that joins:
+- `Transaction` table
+- `TransactionAccountingLine` table
+- `Account` table
+- `TransactionLine` table
 
-### How It Works
+The query filters for:
+- Posted transactions (`t.Posting = 'T'`)
+- Posted accounting lines (`tal.Posting = 'T'`)
+- Lines with debit or credit amounts
+- Optional: Last modified date filter for incremental syncs
 
-1. **Truncate**: The target table is completely truncated before each sync
-2. **Reload**: All data for the specified date range/period is extracted and loaded
-3. **Consistency**: Ensures any deletions, modifications, or corrections in NetSuite are reflected
+## Performance & Memory Management
 
-### Use Cases
+The tap uses memory-optimized processing with:
+- **Pagination**: Fetches data in pages (default: 5000 records per page)
+- **Batch Processing**: Processes records in batches (default: 100000 records per batch)
+- **Streaming**: Records are processed and released from memory immediately
+- **Garbage Collection**: Aggressive memory cleanup between batches
 
-- **Rolling Window**: Refresh specific time periods (e.g., monthly GL closes)
-- **Data Corrections**: Account for NetSuite adjustments or corrections
-- **Audit Compliance**: Ensure target data exactly matches NetSuite
-- **Deletion Handling**: Properly handle deleted transactions
-
-### Best Practices
-
-- Use specific periods (`period_name`/`period_id`) for time-based filtering
-- Run separate syncs for different time periods to maintain granular control
-- Monitor sync duration for large date ranges
-- Consider target system's truncate/load performance characteristics
+This approach handles large datasets efficiently while minimizing memory usage.
 
 ## NetSuite Setup
 
-This tap requires a NetSuite RESTlet script and saved search to be configured:
+### Required Permissions
 
-### RESTlet Configuration
+Ensure the authenticating user/role has:
+1. Access to Transaction, TransactionAccountingLine, Account, and TransactionLine records
+2. SuiteQL query permissions
+3. REST Web Services permission
+4. OAuth Token-based authentication setup
 
-1. Deploy the included RESTlet script (`netsuite_macro.js`) in NetSuite
-2. Note the Script ID and Deployment ID (`netsuite_script_id` and `netsuite_deploy_id`)
-3. Ensure proper permissions are configured
+### OAuth Authentication
 
-### Saved Search
-
-1. Create or use the saved Search ID (`netsuite_search_id`)
-2. Ensure it includes all required GL detail fields
-3. Configure appropriate permissions
-
-### Authentication
-
-1. Set up OAuth 2.0 authentication in NetSuite
-2. Generate consumer key/secret and token ID/secret
-3. Ensure the authenticating user has appropriate permissions
+1. Create an Integration Record in NetSuite
+2. Note the Consumer Key and Consumer Secret
+3. Create an Access Token
+4. Note the Token ID and Token Secret
+5. Use these credentials in your configuration
 
 ## Development
 
@@ -291,21 +190,6 @@ Run tests:
 
 ```bash
 pytest
-```
-
-### Testing Full Refresh
-
-To test the full refresh functionality:
-
-```bash
-# Generate catalog
-tap-netsuite-general-ledger --config your_config.json --discover > catalog.json
-
-# Test full refresh with a small date range
-tap-netsuite-general-ledger --config your_config.json --catalog catalog.json
-
-# Verify TRUNCATE message is emitted before records
-# Check that all records for the date range are extracted
 ```
 
 ## License
