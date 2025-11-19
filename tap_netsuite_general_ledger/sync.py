@@ -143,7 +143,11 @@ def transform_record(
     ]
     for field in string_fields:
         value = record.get(field)
-        transformed[field] = str(value) if value is not None else None
+        # Only convert to string if not None; keep None as None
+        if value is not None and value != '':
+            transformed[field] = str(value)
+        else:
+            transformed[field] = None
 
     # Integer fields
     integer_fields = [

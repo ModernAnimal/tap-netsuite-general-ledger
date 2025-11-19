@@ -16,82 +16,48 @@ def get_gl_detail_schema() -> Dict[str, Any]:
         "properties": {
             "posting_period": {
                 "type": ["null", "string"],
-                "description": "Posting period name"
+                "description": "Posting period name (display format)"
             },
-            "postingPeriodID": {
+            "posting_period_id": {
                 "type": ["null", "integer"],
-                "description": "Posting period ID"
-            },
-            "createdDate": {
-                "type": ["null", "string"],
-                "format": "date-time",
-                "description": "Date created"
-            },
-            "lastmodified": {
-                "type": ["null", "string"],
-                "format": "date-time",
-                "description": "Last modified date"
-            },
-            "posting": {
-                "type": ["null", "string"],
-                "description": "Posting flag"
-            },
-            "approval": {
-                "type": ["null", "string"],
-                "description": "Approval status"
-            },
-            "transaction_date": {
-                "type": ["null", "string"],
-                "format": "date",
-                "description": "Transaction date"
-            },
-            "transactionid": {
-                "type": ["null", "string"],
-                "description": "Transaction ID"
-            },
-            "transAcctLineID": {
-                "type": ["null", "integer"],
-                "description": "Transaction accounting line ID"
+                "description": "Posting period internal ID"
             },
             "internalid": {
                 "type": ["null", "integer"],
                 "description": "Internal ID of the transaction"
             },
-            "entity_name": {
+            "tran_id": {
                 "type": ["null", "string"],
-                "description": "Entity name"
-            },
-            "transmemo": {
-                "type": ["null", "string"],
-                "description": "Transaction memo"
-            },
-            "translineMemo": {
-                "type": ["null", "string"],
-                "description": "Transaction line memo"
+                "description": "Transaction ID"
             },
             "transaction_type": {
                 "type": ["null", "string"],
-                "description": "Transaction type"
+                "description": "Transaction type (display format)"
+            },
+            "tran_date": {
+                "type": ["null", "string"],
+                "format": "date",
+                "description": "Transaction date"
+            },
+            "transAcctLineID": {
+                "type": ["null", "integer"],
+                "description": "Transaction line ID"
             },
             "acctID": {
                 "type": ["null", "integer"],
-                "description": "Account ID"
+                "description": "Account internal ID"
             },
-            "accountgroup": {
-                "type": ["null", "integer"],
-                "description": "Account group (parent account)"
+            "account_number": {
+                "type": ["null", "string"],
+                "description": "Account number"
             },
-            "department": {
-                "type": ["null", "integer"],
-                "description": "Department ID"
+            "account_name": {
+                "type": ["null", "string"],
+                "description": "Account name"
             },
-            "class": {
-                "type": ["null", "integer"],
-                "description": "Class ID"
-            },
-            "location": {
-                "type": ["null", "integer"],
-                "description": "Location ID"
+            "net_amount": {
+                "type": ["null", "number"],
+                "description": "Net amount"
             },
             "debit": {
                 "type": ["null", "number"],
@@ -101,21 +67,56 @@ def get_gl_detail_schema() -> Dict[str, Any]:
                 "type": ["null", "number"],
                 "description": "Credit amount"
             },
-            "net_amount": {
-                "type": ["null", "number"],
-                "description": "Net amount"
-            },
-            "subsidiary": {
+            "memo": {
                 "type": ["null", "string"],
-                "description": "Subsidiary"
+                "description": "Transaction line memo"
             },
-            "document_number": {
+            "account_type": {
                 "type": ["null", "string"],
-                "description": "Document number"
+                "description": "Account type"
             },
-            "status": {
+            "department_name": {
                 "type": ["null", "string"],
-                "description": "Status"
+                "description": "Department name"
+            },
+            "class_name": {
+                "type": ["null", "string"],
+                "description": "Class name"
+            },
+            "location_name": {
+                "type": ["null", "string"],
+                "description": "Location name"
+            },
+            "entity_id": {
+                "type": ["null", "integer"],
+                "description": "Entity internal ID"
+            },
+            "entity_name": {
+                "type": ["null", "string"],
+                "description": "Entity name (display format)"
+            },
+            "subsidiary_id": {
+                "type": ["null", "integer"],
+                "description": "Subsidiary internal ID"
+            },
+            "subsidiary_name": {
+                "type": ["null", "string"],
+                "description": "Subsidiary name (display format)"
+            },
+            "currency": {
+                "type": ["null", "string"],
+                "description": "Currency (display format)"
+            },
+            "lastmodified": {
+                "type": ["null", "string"],
+                "format": "date-time",
+                "description": "Last modified date"
+            },
+            "account_internalid": {
+                "type": ["null", "integer"],
+                "description": (
+                    "Account internal ID (duplicate for compatibility)"
+                )
             }
         }
     }
