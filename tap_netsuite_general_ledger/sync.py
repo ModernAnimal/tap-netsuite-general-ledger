@@ -59,7 +59,7 @@ def convert_to_integer(value: Any) -> Any:
 
 def format_date(date_str: Any) -> str:
     """Format date string to ISO format (YYYY-MM-DD)"""
-    if not date_str or date_str == '':
+    if date_str is None or date_str == '':
         return None
 
     # If already a string, try to parse and format it
@@ -101,7 +101,7 @@ def format_date(date_str: Any) -> str:
 
 def format_datetime(datetime_str: Any) -> str:
     """Format datetime string to ISO format with timezone"""
-    if not datetime_str or datetime_str == '':
+    if datetime_str is None or datetime_str == '':
         return None
 
     if isinstance(datetime_str, str):
