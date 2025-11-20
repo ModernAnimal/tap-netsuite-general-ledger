@@ -188,8 +188,16 @@ class NetSuiteClient:
         # Add incremental filter if last_modified_date is set
         if self.last_modified_date:
             query += (
-                f" AND t.lastModifiedDate >= "
-                f"TO_DATE('{self.last_modified_date}', 'YYYY-MM-DD')"
+                f"""
+                    AND (
+                        t.lastModifiedDate >=
+                        TO_DATE('{self.last_modified_date}', 'YYYY-MM-DD')
+                        OR tal.lastModifiedDate >=
+                        TO_DATE('{self.last_modified_date}', 'YYYY-MM-DD')
+                        OR a.lastModifiedDate >=
+                        TO_DATE('{self.last_modified_date}', 'YYYY-MM-DD')
+                    )
+                """
             )
 
         # Order by transaction ID and line ID for consistent pagination
