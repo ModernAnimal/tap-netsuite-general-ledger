@@ -30,9 +30,17 @@ def get_gl_detail_schema() -> Dict[str, Any]:
                 "type": ["null", "string"],
                 "description": "Date created"
             },
-            "last_modified": {
+            "trans_acct_line_last_modified": {
                 "type": ["null", "string"],
-                "description": "Last modified date"
+                "description": "Transaction accounting line last modified date"
+            },
+            "transaction_last_modified": {
+                "type": ["null", "string"],
+                "description": "Transaction last modified date"
+            },
+            "account_last_modified": {
+                "type": ["null", "string"],
+                "description": "Account last modified date"
             },
             "posting": {
                 "type": ["null", "string"],
