@@ -295,11 +295,23 @@ def _sync_stream_with_memory_optimization(
                     sync_state['total_processed'] += 1
                 except BrokenPipeError:
                     LOGGER.error(
-                        f"Broken pipe error - target process terminated after "
-                        f"{sync_state['total_processed']} records. "
+                        f"Broken pipe error - target process terminated "
+                        f"after {sync_state['total_processed']} records "
+                        f"(batch {batch_num}, record {len(batch)}). "
+                        f"This usually indicates the target crashed. "
                         f"Check target logs for errors."
                     )
                     raise
+                except IOError as io_error:
+                    if io_error.errno == 32:  # EPIPE
+                        LOGGER.error(
+                            f"Broken pipe (IOError) - target terminated "
+                            f"after {sync_state['total_processed']} records. "
+                            f"Check target logs."
+                        )
+                        raise BrokenPipeError from io_error
+                    else:
+                        raise
                 except Exception as write_error:
                     LOGGER.error(f"Error writing record: {str(write_error)}")
                     continue

@@ -49,7 +49,7 @@ pip install tap-netsuite-general-ledger
 |---------|------|---------|-------------|
 | `last_modified_date` | string | `null` | Date for incremental sync (format: `YYYY-MM-DD`). Omit for full refresh. |
 | `page_size` | integer | `1000` | Records per API request (max: 1000 per NetSuite limits) |
-| `batch_size` | integer | `100000` | Records per processing batch for memory management |
+| `batch_size` | integer | `100000` | Records per processing batch for memory management. State is written after each batch. |
 
 ### Sample Configuration
 
@@ -62,7 +62,7 @@ pip install tap-netsuite-general-ledger
   "netsuite_token_id": "your_token_id",
   "netsuite_token_secret": "your_token_secret",
   "page_size": 1000,
-  "batch_size": 100000
+  "batch_size": 10000
 }
 ```
 
@@ -76,7 +76,7 @@ pip install tap-netsuite-general-ledger
   "netsuite_token_secret": "your_token_secret",
   "last_modified_date": "2025-11-17",
   "page_size": 1000,
-  "batch_size": 100000
+  "batch_size": 10000
 }
 ```
 
@@ -222,9 +222,11 @@ NetSuite SuiteQL has a **maximum offset of 99,000** records. The tap automatical
 
 | Dataset Size | page_size | batch_size | Notes |
 |--------------|-----------|------------|-------|
-| < 100k records | 1000 | 100000 | Standard configuration |
-| 100k - 1M records | 1000 | 100000 | ID-chunking automatically engaged |
-| > 1M records | 1000 | 50000 | Consider smaller batches for stability |
+| < 100k records | 1000 | 10000 | Recommended for most use cases |
+| 100k - 1M records | 1000 | 10000 | ID-chunking automatically engaged |
+| > 1M records | 1000 | 5000 | Smaller batches for stability |
+
+**Note:** State is written after each batch to ensure reliable checkpointing and recovery.
 
 ## Data Quality & Validation
 
@@ -310,8 +312,9 @@ If authentication fails, you'll see OAuth signature errors or 401 responses.
 - Ensure sufficient system memory (recommend 4GB+ for large datasets)
 
 **Broken Pipe Errors**
-- Usually indicates the target process terminated
-- Check target logs for schema mismatches or constraint violations
+- Usually indicates the **target process terminated** (not the tap!)
+- Check target logs for schema mismatches, constraint violations, or OOM errors
+- Try reducing `batch_size` to 10000 or lower to reduce memory pressure
 - Verify catalog schema matches target table schema
 
 ### Debug Logging
