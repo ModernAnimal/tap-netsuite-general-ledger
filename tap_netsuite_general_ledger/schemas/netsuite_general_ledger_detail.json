@@ -6,17 +6,15 @@
       "description": "Posting period name (display format)"
     },
     "posting_period_id": {
-      "type": ["null", "integer"],
+      "type": ["null", "string"],
       "description": "Posting period internal ID"
     },
     "created_date": {
       "type": ["null", "string"],
-      "format": "date-time",
       "description": "Date created"
     },
     "lastmodified": {
       "type": ["null", "string"],
-      "format": "date-time",
       "description": "Last modified date"
     },
     "posting": {
@@ -29,7 +27,6 @@
     },
     "transaction_date": {
       "type": ["null", "string"],
-      "format": "date",
       "description": "Transaction date"
     },
     "transaction_id": {
@@ -37,11 +34,11 @@
       "description": "Transaction ID"
     },
     "trans_acct_line_id": {
-      "type": ["null", "integer"],
+      "type": ["null", "string"],
       "description": "Transaction accounting line ID"
     },
     "internalid": {
-      "type": ["null", "integer"],
+      "type": ["null", "string"],
       "description": "Internal ID of the transaction"
     },
     "entity_name": {
@@ -61,35 +58,35 @@
       "description": "Transaction type"
     },
     "acct_id": {
-      "type": ["null", "integer"],
+      "type": ["null", "string"],
       "description": "Account ID"
     },
     "account_group": {
-      "type": ["null", "integer"],
+      "type": ["null", "string"],
       "description": "Account group (parent account)"
     },
     "department": {
-      "type": ["null", "integer"],
+      "type": ["null", "string"],
       "description": "Department ID"
     },
     "class": {
-      "type": ["null", "integer"],
+      "type": ["null", "string"],
       "description": "Class ID"
     },
     "location": {
-      "type": ["null", "integer"],
+      "type": ["null", "string"],
       "description": "Location ID"
     },
     "debit": {
-      "type": ["null", "number"],
+      "type": ["null", "string"],
       "description": "Debit amount"
     },
     "credit": {
-      "type": ["null", "number"],
+      "type": ["null", "string"],
       "description": "Credit amount"
     },
     "net_amount": {
-      "type": ["null", "number"],
+      "type": ["null", "string"],
       "description": "Net amount"
     },
     "subsidiary": {

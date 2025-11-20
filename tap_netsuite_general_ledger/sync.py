@@ -68,7 +68,7 @@ def format_date(date_str: Any) -> str:
         if len(date_str) >= 10 and date_str[4] == '-' and date_str[7] == '-':
             # Already in YYYY-MM-DD format (or YYYY-MM-DD HH:MM:SS)
             return date_str[:10]
-        
+
         try:
             # Common NetSuite date formats
             formats = [
@@ -112,7 +112,7 @@ def format_datetime(datetime_str: Any) -> str:
                 return datetime_str
             else:
                 return datetime_str + 'Z'
-        
+
         try:
             # Common NetSuite datetime formats
             formats = [
@@ -148,46 +148,34 @@ def transform_record(
     client: NetSuiteClient
 ) -> Dict[str, Any]:
     """Transform NetSuite SuiteQL record to schema format
-
-    SuiteQL returns flat JSON, so we just need to handle type conversions
+    
+    Simply converts all values to strings for simplicity.
+    Type casting will be handled by the target (Redshift).
     """
     transformed = {}
 
-    # String fields - use as-is or convert to string
-    string_fields = [
-        'posting_period', 'posting', 'approval', 'transaction_id',
-        'entity_name', 'trans_memo', 'trans_line_memo', 'transaction_type',
-        'subsidiary', 'document_number', 'status'
-    ]
-    for field in string_fields:
-        value = record.get(field)
-        # Only convert to string if not None; keep None as None
+    # Convert all fields to strings, keeping None as None
+    for field, value in record.items():
         if value is not None and value != '':
             transformed[field] = str(value)
         else:
             transformed[field] = None
 
-    # Integer fields
-    integer_fields = [
-        'posting_period_id', 'trans_acct_line_id', 'internalid',
-        'acct_id', 'account_group', 'department', 'class', 'location'
-    ]
-    for field in integer_fields:
-        transformed[field] = convert_to_integer(record.get(field))
+    # Validate that key fields are not None or empty
+    if not transformed.get('trans_acct_line_id'):
+        LOGGER.warning(
+            f"Skipping record with NULL/empty trans_acct_line_id: "
+            f"internalid={transformed.get('internalid')}, "
+            f"raw_value={record.get('trans_acct_line_id')}"
+        )
+        return None
 
-    # Numeric fields (float)
-    numeric_fields = ['debit', 'credit', 'net_amount']
-    for field in numeric_fields:
-        transformed[field] = convert_to_number(record.get(field))
-
-    # Date fields
-    transformed['transaction_date'] = format_date(
-        record.get('transaction_date')
-    )
-
-    # Datetime fields
-    transformed['created_date'] = format_datetime(record.get('created_date'))
-    transformed['last_modified'] = format_datetime(record.get('last_modified'))
+    if not transformed.get('internalid'):
+        LOGGER.warning(
+            f"Skipping record with NULL/empty internalid: "
+            f"trans_acct_line_id={transformed.get('trans_acct_line_id')}"
+        )
+        return None
 
     return transformed
 
@@ -296,6 +284,11 @@ def _sync_stream_with_memory_optimization(
         for record in batch:
             try:
                 transformed = transform_record(record, client)
+
+                # Skip records where transformation returned None
+                # (indicates missing required fields)
+                if transformed is None:
+                    continue
 
                 try:
                     singer.write_record(stream_name, transformed)

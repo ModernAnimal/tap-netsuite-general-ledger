@@ -10,7 +10,11 @@ from singer import Schema, CatalogEntry, Catalog
 
 
 def get_gl_detail_schema() -> Dict[str, Any]:
-    """Get the schema for GL detail records from SuiteQL"""
+    """Get the schema for GL detail records from SuiteQL
+    
+    All fields are defined as strings for simplicity.
+    Type casting will be handled by the target (Redshift).
+    """
     return {
         "type": "object",
         "properties": {
@@ -19,17 +23,15 @@ def get_gl_detail_schema() -> Dict[str, Any]:
                 "description": "Posting period name (display format)"
             },
             "posting_period_id": {
-                "type": ["null", "integer"],
+                "type": ["null", "string"],
                 "description": "Posting period internal ID"
             },
             "created_date": {
                 "type": ["null", "string"],
-                "format": "date-time",
                 "description": "Date created"
             },
             "last_modified": {
                 "type": ["null", "string"],
-                "format": "date-time",
                 "description": "Last modified date"
             },
             "posting": {
@@ -42,7 +44,6 @@ def get_gl_detail_schema() -> Dict[str, Any]:
             },
             "transaction_date": {
                 "type": ["null", "string"],
-                "format": "date",
                 "description": "Transaction date"
             },
             "transaction_id": {
@@ -50,11 +51,11 @@ def get_gl_detail_schema() -> Dict[str, Any]:
                 "description": "Transaction ID"
             },
             "trans_acct_line_id": {
-                "type": ["null", "integer"],
+                "type": ["null", "string"],
                 "description": "Transaction accounting line ID"
             },
             "internalid": {
-                "type": ["null", "integer"],
+                "type": ["null", "string"],
                 "description": "Internal ID of the transaction"
             },
             "entity_name": {
@@ -74,35 +75,35 @@ def get_gl_detail_schema() -> Dict[str, Any]:
                 "description": "Transaction type"
             },
             "acct_id": {
-                "type": ["null", "integer"],
+                "type": ["null", "string"],
                 "description": "Account ID"
             },
             "account_group": {
-                "type": ["null", "integer"],
+                "type": ["null", "string"],
                 "description": "Account group (parent account)"
             },
             "department": {
-                "type": ["null", "integer"],
+                "type": ["null", "string"],
                 "description": "Department ID"
             },
             "class": {
-                "type": ["null", "integer"],
+                "type": ["null", "string"],
                 "description": "Class ID"
             },
             "location": {
-                "type": ["null", "integer"],
+                "type": ["null", "string"],
                 "description": "Location ID"
             },
             "debit": {
-                "type": ["null", "number"],
+                "type": ["null", "string"],
                 "description": "Debit amount"
             },
             "credit": {
-                "type": ["null", "number"],
+                "type": ["null", "string"],
                 "description": "Credit amount"
             },
             "net_amount": {
-                "type": ["null", "number"],
+                "type": ["null", "string"],
                 "description": "Net amount"
             },
             "subsidiary": {

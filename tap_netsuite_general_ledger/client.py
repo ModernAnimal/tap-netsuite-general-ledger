@@ -133,16 +133,16 @@ class NetSuiteClient:
         #       TransactionLine (tl) has department/class/location/memo
         query = """
         SELECT
+            t.ID AS internalid,
+            t.Trandate AS transaction_date,
+            t.TranID AS transaction_id,
+            tal.TransactionLine AS trans_acct_line_id,
             BUILTIN.DF(t.PostingPeriod) AS posting_period,
             t.PostingPeriod AS posting_period_id,
             t.createdDateTime AS created_date,
             tal.lastmodifieddate AS last_modified,
             t.Posting AS posting,
             BUILTIN.DF(t.approvalStatus) AS approval,
-            t.Trandate AS transaction_date,
-            t.TranID AS transaction_id,
-            tal.TransactionLine AS trans_acct_line_id,
-            t.ID AS internalid,
             BUILTIN.DF(t.Entity) AS entity_name,
             t.memo AS trans_memo,
             tl.memo AS trans_line_memo,
@@ -171,9 +171,12 @@ class NetSuiteClient:
             AND tl.id = tal.TransactionLine
         )
         WHERE
-            t.PostingPeriod IS NOT NULL
-            AND tal.Account IS NOT NULL
-            AND tal.TransactionLine IS NOT NULL
+            ( t.Posting = 'T' )
+            AND ( tal.Posting = 'T' )
+            AND (
+                ( tal.Debit IS NOT NULL )
+                OR ( tal.Credit IS NOT NULL )
+            )
         """
 
         # Add ID filter if chunking (to handle offset limit)
@@ -188,7 +191,7 @@ class NetSuiteClient:
             )
 
         # Order by transaction ID and line ID for consistent pagination
-        query += " ORDER BY t.ID, tl.ID"
+        query += "ORDER BY t.id, t.TranDate, t.TranID, tal.TransactionLine"
 
         return query
 
