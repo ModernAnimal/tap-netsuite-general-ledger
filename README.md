@@ -148,34 +148,38 @@ When `last_modified_date` is provided, the tap only fetches records where `t.las
 
 ### Field Definitions
 
-All fields are returned as **strings** for flexibility. Type casting should be handled by the target system (e.g., Redshift, Snowflake).
+Fields are typed appropriately for optimal downstream processing:
+- **Integers**: IDs and foreign keys (`internal_id`, `acct_id`, `location`, etc.)
+- **Numbers**: Monetary amounts (`debit`, `credit`, `net_amount`)
+- **Dates**: Date fields in YYYY-MM-DD format (`transaction_date`, `account_last_modified`, etc.)
+- **Strings**: All other fields (names, memos, status, etc.)
 
 | Field Name | Type | Description | Source Table |
 |------------|------|-------------|--------------|
-| `internal_id` | string | Transaction internal ID | `Transaction.ID` |
-| `transaction_date` | string | Transaction date | `Transaction.TranDate` |
+| `internal_id` | integer | Transaction internal ID | `Transaction.ID` |
+| `transaction_date` | string (date) | Transaction date (YYYY-MM-DD) | `Transaction.TranDate` |
 | `transaction_id` | string | Transaction number/ID | `Transaction.TranID` |
-| `trans_acct_line_id` | string | Accounting line ID | `TransactionAccountingLine.TransactionLine` |
+| `trans_acct_line_id` | integer | Accounting line ID | `TransactionAccountingLine.TransactionLine` |
 | `posting_period` | string | Posting period name | `BUILTIN.DF(Transaction.PostingPeriod)` |
-| `posting_period_id` | string | Posting period internal ID | `Transaction.PostingPeriod` |
-| `created_date` | string | Record creation datetime | `Transaction.createdDateTime` |
-| `trans_acct_line_last_modified` | string | Transaction accounting line last modified datetime | `TransactionAccountingLine.lastmodifieddate` |
-| `transaction_last_modified` | string | Transaction last modified datetime | `Transaction.lastmodifieddate` |
-| `account_last_modified` | string | Account last modified datetime | `Account.lastmodifieddate` |
+| `posting_period_id` | integer | Posting period internal ID | `Transaction.PostingPeriod` |
+| `created_date` | string (datetime) | Record creation datetime (ISO 8601) | `Transaction.createdDateTime` |
+| `trans_acct_line_last_modified` | string (date) | Transaction accounting line last modified (YYYY-MM-DD) | `TransactionAccountingLine.lastmodifieddate` |
+| `transaction_last_modified` | string (date) | Transaction last modified (YYYY-MM-DD) | `Transaction.lastmodifieddate` |
+| `account_last_modified` | string (date) | Account last modified (YYYY-MM-DD) | `Account.lastmodifieddate` |
 | `posting` | string | Posting flag (T/F) | `Transaction.Posting` |
 | `approval` | string | Approval status | `BUILTIN.DF(Transaction.approvalStatus)` |
 | `entity_name` | string | Entity/customer/vendor name | `BUILTIN.DF(Transaction.Entity)` |
 | `trans_memo` | string | Transaction-level memo | `Transaction.memo` |
 | `trans_line_memo` | string | Line-level memo | `TransactionLine.memo` |
 | `transaction_type` | string | Transaction type (e.g., Journal Entry) | `BUILTIN.DF(Transaction.Type)` |
-| `acct_id` | string | Account ID | `TransactionAccountingLine.Account` |
-| `account_group` | string | Parent account ID | `Account.parent` |
-| `department` | string | Department ID | `TransactionLine.Department` |
-| `class` | string | Class ID | `TransactionLine.Class` |
-| `location` | string | Location ID | `TransactionLine.Location` |
-| `debit` | string | Debit amount | `TransactionAccountingLine.Debit` |
-| `credit` | string | Credit amount | `TransactionAccountingLine.Credit` |
-| `net_amount` | string | Net amount (debit - credit) | `TransactionAccountingLine.Amount` |
+| `acct_id` | integer | Account ID | `TransactionAccountingLine.Account` |
+| `account_group` | integer | Parent account ID | `Account.parent` |
+| `department` | integer | Department ID | `TransactionLine.Department` |
+| `class` | integer | Class ID | `TransactionLine.Class` |
+| `location` | integer | Location ID | `TransactionLine.Location` |
+| `debit` | number | Debit amount | `TransactionAccountingLine.Debit` |
+| `credit` | number | Credit amount | `TransactionAccountingLine.Credit` |
+| `net_amount` | number | Net amount (debit - credit) | `TransactionAccountingLine.Amount` |
 | `subsidiary` | string | Subsidiary name | `BUILTIN.DF(TransactionLine.Subsidiary)` |
 | `document_number` | string | Document number | `Transaction.Number` |
 | `status` | string | Transaction status | `BUILTIN.DF(Transaction.Status)` |
@@ -241,9 +245,16 @@ Records are **skipped** (with warning logged) if:
 This prevents downstream primary key constraint violations.
 
 ### Type Conversion
-All fields are converted to **strings** with `None` preserved for NULL values. No date parsing or numeric conversion is performed by the tap.
 
-**Rationale:** Downstream targets (Redshift, Snowflake, etc.) have more robust type casting capabilities and can handle conversions during COPY operations or with SQL CAST functions.
+Fields are converted to appropriate types during extraction:
+
+- **Integers**: ID fields are converted to integers (`internal_id`, `acct_id`, `location`, etc.)
+- **Numbers**: Monetary amounts are converted to numbers/floats (`debit`, `credit`, `net_amount`)
+- **Dates**: Date fields are formatted to YYYY-MM-DD (`transaction_date`, `account_last_modified`, etc.)
+- **Datetimes**: Datetime fields are formatted to ISO 8601 (`created_date`)
+- **Strings**: All other fields remain as strings
+
+This ensures proper typing for downstream targets and enables direct SQL operations without additional casting.
 
 ## NetSuite Setup
 

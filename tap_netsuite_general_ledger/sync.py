@@ -148,21 +148,52 @@ def transform_record(
     client: NetSuiteClient
 ) -> Dict[str, Any]:
     """Transform NetSuite SuiteQL record to schema format
-    
-    Simply converts all values to strings for simplicity.
-    Type casting will be handled by the target (Redshift).
+
+    Converts values to appropriate data types based on field names.
     """
     transformed = {}
 
-    # Convert all fields to strings, keeping None as None
+    # Define field type mappings
+    integer_fields = {
+        'internal_id', 'posting_period_id', 'trans_acct_line_id',
+        'acct_id', 'account_group', 'department', 'class', 'location'
+    }
+
+    number_fields = {
+        'debit', 'credit', 'net_amount'
+    }
+
+    date_fields = {
+        'transaction_date', 'account_last_modified',
+        'trans_acct_line_last_modified', 'transaction_last_modified'
+    }
+
+    datetime_fields = {
+        'created_date'
+    }
+
     for field, value in record.items():
-        if value is not None and value != '':
-            transformed[field] = str(value)
-        else:
+        # Handle null/empty values
+        if value is None or value == '':
             transformed[field] = None
+            continue
+
+        # Convert based on field type
+        if field in integer_fields:
+            transformed[field] = convert_to_integer(value)
+        elif field in number_fields:
+            transformed[field] = convert_to_number(value)
+        elif field in date_fields:
+            transformed[field] = format_date(value)
+        elif field in datetime_fields:
+            transformed[field] = format_datetime(value)
+        else:
+            # Keep as string
+            transformed[field] = str(value)
 
     # Validate that key fields are not None or empty
-    if not transformed.get('trans_acct_line_id'):
+    # Note: Use explicit None check because 0 is a valid integer value
+    if transformed.get('trans_acct_line_id') is None:
         LOGGER.warning(
             f"Skipping record with NULL/empty trans_acct_line_id: "
             f"internal_id={transformed.get('internal_id')}, "
@@ -170,7 +201,7 @@ def transform_record(
         )
         return None
 
-    if not transformed.get('internal_id'):
+    if transformed.get('internal_id') is None:
         LOGGER.warning(
             f"Skipping record with NULL/empty internal_id: "
             f"trans_acct_line_id={transformed.get('trans_acct_line_id')}"
