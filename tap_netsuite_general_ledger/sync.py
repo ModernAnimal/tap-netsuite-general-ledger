@@ -165,14 +165,14 @@ def transform_record(
     if not transformed.get('trans_acct_line_id'):
         LOGGER.warning(
             f"Skipping record with NULL/empty trans_acct_line_id: "
-            f"internalid={transformed.get('internalid')}, "
+            f"internal_id={transformed.get('internal_id')}, "
             f"raw_value={record.get('trans_acct_line_id')}"
         )
         return None
 
-    if not transformed.get('internalid'):
+    if not transformed.get('internal_id'):
         LOGGER.warning(
-            f"Skipping record with NULL/empty internalid: "
+            f"Skipping record with NULL/empty internal_id: "
             f"trans_acct_line_id={transformed.get('trans_acct_line_id')}"
         )
         return None

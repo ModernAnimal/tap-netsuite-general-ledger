@@ -133,7 +133,7 @@ class NetSuiteClient:
         #       TransactionLine (tl) has department/class/location/memo
         query = """
         SELECT
-            t.ID AS internalid,
+            t.ID AS internal_id,
             t.Trandate AS transaction_date,
             t.TranID AS transaction_id,
             tal.TransactionLine AS trans_acct_line_id,
@@ -301,7 +301,7 @@ class NetSuiteClient:
             if chunk_records:
                 # Get the last internal ID from this chunk for next iteration
                 last_record = chunk_records[-1]
-                last_internal_id = int(last_record.get('internalid', 0))
+                last_internal_id = int(last_record.get('internal_id', 0))
 
                 LOGGER.info(
                     f"Chunk {chunk_num} complete: {len(chunk_records)} "
@@ -313,7 +313,7 @@ class NetSuiteClient:
                     chunk_num += 1
                     LOGGER.info(
                         f"Continuing to next chunk "
-                        f"(ID filter: internalid > {last_internal_id})"
+                        f"(ID filter: internal_id > {last_internal_id})"
                     )
                     continue
                 else:

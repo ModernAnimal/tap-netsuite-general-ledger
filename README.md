@@ -1,18 +1,23 @@
 # tap-netsuite-general-ledger
 
-A [Singer](https://www.singer.io/) tap for extracting NetSuite General Ledger Detail using SuiteQL.
+A [Singer](https://www.singer.io/) tap for extracting NetSuite General Ledger Detail using the SuiteQL REST API.
 
 ## Overview
 
-This tap extracts GL Detail data from NetSuite via the SuiteQL REST API using OAuth 1.0a authentication. It supports both full refresh and incremental sync modes based on the `lastmodified` field.
+This tap extracts General Ledger Detail data from NetSuite via the **SuiteQL REST API** using OAuth 1.0a authentication. It supports both full refresh and incremental sync modes based on the `last_modified_date` configuration.
+
+**Key Features:**
+- 🚀 Uses NetSuite's modern SuiteQL REST API (not RESTlet)
+- 🔐 OAuth 1.0a HMAC-SHA256 authentication
+- 📊 Extracts posted GL transactions with full accounting dimensions
+- 🔄 Supports incremental syncs via `last_modified_date` filter
+- 💾 Memory-optimized streaming for large datasets (>100k records)
+- 🎯 All fields returned as strings for flexible downstream type casting
+- 🔑 Composite key support: `internal_id`, `transaction_id`, `trans_acct_line_id`
 
 ## Installation
 
-```bash
-pip install tap-netsuite-general-ledger
-```
-
-Or install from source:
+Install from source:
 
 ```bash
 git clone https://github.com/ModernAnimal/tap-netsuite-general-ledger.git
@@ -20,25 +25,35 @@ cd tap-netsuite-general-ledger
 pip install -e .
 ```
 
+Or install directly:
+
+```bash
+pip install tap-netsuite-general-ledger
+```
+
 ## Configuration
 
-### Required Configuration
+### Required Settings
 
-- `netsuite_account`: Your NetSuite account ID
-- `netsuite_consumer_key`: OAuth consumer key
-- `netsuite_consumer_secret`: OAuth consumer secret  
-- `netsuite_token_id`: OAuth token ID
-- `netsuite_token_secret`: OAuth token secret
+| Setting | Type | Description |
+|---------|------|-------------|
+| `netsuite_account` | string | Your NetSuite account ID (e.g., "5665960") |
+| `netsuite_consumer_key` | string | OAuth consumer key from Integration record |
+| `netsuite_consumer_secret` | string | OAuth consumer secret from Integration record |
+| `netsuite_token_id` | string | OAuth token ID from Access Token |
+| `netsuite_token_secret` | string | OAuth token secret from Access Token |
 
-### Optional Configuration
+### Optional Settings
 
-- `last_modified_date`: Date for incremental sync (format: `YYYY-MM-DD`). If not provided, performs full refresh.
-- `page_size`: Number of records to fetch per API request (default: `5000`)
-- `batch_size`: Number of records to process per batch (default: `100000`)
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `last_modified_date` | string | `null` | Date for incremental sync (format: `YYYY-MM-DD`). Omit for full refresh. |
+| `page_size` | integer | `1000` | Records per API request (max: 1000 per NetSuite limits) |
+| `batch_size` | integer | `100000` | Records per processing batch for memory management |
 
 ### Sample Configuration
 
-**Full Refresh (all data):**
+**Full Refresh (all posted transactions):**
 ```json
 {
   "netsuite_account": "5665960",
@@ -46,7 +61,7 @@ pip install -e .
   "netsuite_consumer_secret": "your_consumer_secret",
   "netsuite_token_id": "your_token_id",
   "netsuite_token_secret": "your_token_secret",
-  "page_size": 5000,
+  "page_size": 1000,
   "batch_size": 100000
 }
 ```
@@ -59,8 +74,8 @@ pip install -e .
   "netsuite_consumer_secret": "your_consumer_secret",
   "netsuite_token_id": "your_token_id",
   "netsuite_token_secret": "your_token_secret",
-  "last_modified_date": "2025-03-01",
-  "page_size": 5000,
+  "last_modified_date": "2025-11-17",
+  "page_size": 1000,
   "batch_size": 100000
 }
 ```
@@ -72,7 +87,7 @@ pip install -e .
 Generate a catalog of available streams:
 
 ```bash
-tap-netsuite-general-ledger --config config.json --discover > catalog.json
+tap-netsuite-general-ledger --config sample_config.json --discover > catalog.json
 ```
 
 ### Sync Mode
@@ -80,115 +95,271 @@ tap-netsuite-general-ledger --config config.json --discover > catalog.json
 Extract data using the catalog:
 
 ```bash
-tap-netsuite-general-ledger --config config.json --catalog catalog.json
+tap-netsuite-general-ledger --config sample_config.json --catalog catalog.json
+```
+
+### With a Singer Target
+
+Pipe output directly to a target (e.g., Redshift):
+
+```bash
+tap-netsuite-general-ledger --config sample_config.json --catalog catalog.json | \
+  target-redshift --config target_config.json
 ```
 
 ### With State (for incremental syncs)
 
 ```bash
-tap-netsuite-general-ledger --config config.json --catalog catalog.json --state state.json
+tap-netsuite-general-ledger \
+  --config sample_config.json \
+  --catalog catalog.json \
+  --state state.json > output.json
 ```
 
 ## Sync Modes
 
 ### Full Refresh
-When `last_modified_date` is not provided, the tap fetches all GL transactions that meet the posting criteria.
+When `last_modified_date` is **not** provided in config, the tap fetches **all** GL transactions that meet the posting criteria (posted transactions with debit or credit amounts).
+
+**Use Case:** Initial data loads, historical backfills, complete refreshes
 
 ### Incremental Sync
-When `last_modified_date` is provided, the tap only fetches records where `tal.lastmodifieddate >= last_modified_date`. This is ideal for:
-- Regular scheduled syncs
-- Reducing data transfer
+When `last_modified_date` is provided, the tap only fetches records where `t.lastModifiedDate >= last_modified_date`. 
+
+**Use Case:** 
+- Regular scheduled syncs (e.g., daily updates)
+- Reducing data transfer volume
 - Capturing recent changes only
 
-## Streams
+**Example:** Set `last_modified_date` to the date of your last successful sync to only fetch new/modified records.
+
+## Stream Details
 
 ### netsuite_general_ledger_detail
 
-**Key Properties**: `internalid`, `transAcctLineID`
+**Key Properties (Composite Primary Key):** 
+- `internal_id` (Transaction ID)
+- `transaction_id` (Transaction TranID)
+- `trans_acct_line_id` (Transaction Accounting Line ID)
 
-**Replication Method**: `FULL_TABLE` or `INCREMENTAL` (based on `last_modified_date`)
+**Replication Method:** `FULL_TABLE` or `INCREMENTAL` (based on `last_modified_date` configuration)
 
-**Fields**:
+**Record Count:** Varies by NetSuite instance (can range from thousands to millions)
 
-- `posting_period`: Posting period name
-- `postingPeriodID`: Posting period ID
-- `createdDate`: Date created (datetime)
-- `lastmodified`: Last modified date (datetime)
-- `posting`: Posting flag
-- `approval`: Approval status
-- `transaction_date`: Transaction date
-- `transactionid`: Transaction ID
-- `transAcctLineID`: Transaction accounting line ID
-- `internalid`: Internal ID of the transaction
-- `entity_name`: Entity name
-- `transmemo`: Transaction memo
-- `translineMemo`: Transaction line memo
-- `transaction_type`: Transaction type
-- `acctID`: Account ID
-- `accountgroup`: Account group (parent account)
-- `department`: Department ID
-- `class`: Class ID
-- `location`: Location ID
-- `debit`: Debit amount
-- `credit`: Credit amount
-- `net_amount`: Net amount
-- `subsidiary`: Subsidiary
-- `document_number`: Document number
-- `status`: Status
+### Field Definitions
 
-## SuiteQL Query
+All fields are returned as **strings** for flexibility. Type casting should be handled by the target system (e.g., Redshift, Snowflake).
 
-The tap executes a SuiteQL query that joins:
-- `Transaction` table
-- `TransactionAccountingLine` table
-- `Account` table
-- `TransactionLine` table
+| Field Name | Type | Description | Source Table |
+|------------|------|-------------|--------------|
+| `internal_id` | string | Transaction internal ID | `Transaction.ID` |
+| `transaction_date` | string | Transaction date | `Transaction.TranDate` |
+| `transaction_id` | string | Transaction number/ID | `Transaction.TranID` |
+| `trans_acct_line_id` | string | Accounting line ID | `TransactionAccountingLine.TransactionLine` |
+| `posting_period` | string | Posting period name | `BUILTIN.DF(Transaction.PostingPeriod)` |
+| `posting_period_id` | string | Posting period internal ID | `Transaction.PostingPeriod` |
+| `created_date` | string | Record creation datetime | `Transaction.createdDateTime` |
+| `last_modified` | string | Last modified datetime | `TransactionAccountingLine.lastmodifieddate` |
+| `posting` | string | Posting flag (T/F) | `Transaction.Posting` |
+| `approval` | string | Approval status | `BUILTIN.DF(Transaction.approvalStatus)` |
+| `entity_name` | string | Entity/customer/vendor name | `BUILTIN.DF(Transaction.Entity)` |
+| `trans_memo` | string | Transaction-level memo | `Transaction.memo` |
+| `trans_line_memo` | string | Line-level memo | `TransactionLine.memo` |
+| `transaction_type` | string | Transaction type (e.g., Journal Entry) | `BUILTIN.DF(Transaction.Type)` |
+| `acct_id` | string | Account ID | `TransactionAccountingLine.Account` |
+| `account_group` | string | Parent account ID | `Account.parent` |
+| `department` | string | Department ID | `TransactionLine.Department` |
+| `class` | string | Class ID | `TransactionLine.Class` |
+| `location` | string | Location ID | `TransactionLine.Location` |
+| `debit` | string | Debit amount | `TransactionAccountingLine.Debit` |
+| `credit` | string | Credit amount | `TransactionAccountingLine.Credit` |
+| `net_amount` | string | Net amount (debit - credit) | `TransactionAccountingLine.Amount` |
+| `subsidiary` | string | Subsidiary name | `BUILTIN.DF(TransactionLine.Subsidiary)` |
+| `document_number` | string | Document number | `Transaction.Number` |
+| `status` | string | Transaction status | `BUILTIN.DF(Transaction.Status)` |
 
-The query filters for:
-- Posted transactions (`t.Posting = 'T'`)
-- Posted accounting lines (`tal.Posting = 'T'`)
-- Lines with debit or credit amounts
-- Optional: Last modified date filter for incremental syncs
+**Note:** The tap uses NetSuite's `BUILTIN.DF()` function to get display format names for foreign key fields instead of numeric IDs where applicable.
 
-## Performance & Memory Management
+## SuiteQL Query Details
 
-The tap uses memory-optimized processing with:
-- **Pagination**: Fetches data in pages (default: 5000 records per page)
-- **Batch Processing**: Processes records in batches (default: 100000 records per batch)
-- **Streaming**: Records are processed and released from memory immediately
-- **Garbage Collection**: Aggressive memory cleanup between batches
+The tap constructs a SuiteQL query that:
 
-This approach handles large datasets efficiently while minimizing memory usage.
+### Joins
+- `Transaction` (header table)
+- `TransactionAccountingLine` (GL impact: debits/credits)
+- `Account` (for account hierarchy)
+- `TransactionLine` (for dimensions: department/class/location)
+
+### Filters
+- `t.Posting = 'T'` - Posted transactions only
+- `tal.Posting = 'T'` - Posted accounting lines only
+- `(tal.Debit IS NOT NULL) OR (tal.Credit IS NOT NULL)` - Lines with amounts
+- Optional: `t.lastModifiedDate >= TO_DATE('YYYY-MM-DD')` for incremental sync
+
+### Ordering
+Results are ordered by `t.ID, t.TranDate, t.TranID, tal.TransactionLine` for consistent pagination.
+
+## Performance & Pagination
+
+### Memory Optimization
+The tap uses streaming architecture to handle large datasets efficiently:
+
+1. **Page Fetching:** Data is fetched in pages (default: 1000 records per API call)
+2. **Batch Processing:** Records are processed in batches (default: 100,000 records)
+3. **Immediate Release:** Each record is transformed and written immediately
+4. **Garbage Collection:** Aggressive memory cleanup between batches
+
+### Handling NetSuite's Offset Limit
+
+NetSuite SuiteQL has a **maximum offset of 99,000** records. The tap automatically handles this by:
+- Using ID-based chunking when datasets exceed 100k records
+- Filtering subsequent queries with `WHERE t.ID > last_processed_id`
+- This allows extraction of unlimited records without hitting the offset limit
+
+### Recommended Settings
+
+| Dataset Size | page_size | batch_size | Notes |
+|--------------|-----------|------------|-------|
+| < 100k records | 1000 | 100000 | Standard configuration |
+| 100k - 1M records | 1000 | 100000 | ID-chunking automatically engaged |
+| > 1M records | 1000 | 50000 | Consider smaller batches for stability |
+
+## Data Quality & Validation
+
+The tap includes validation to ensure data integrity:
+
+### Required Fields Validation
+Records are **skipped** (with warning logged) if:
+- `trans_acct_line_id` is NULL or empty
+- `internal_id` is NULL or empty
+- `transaction_id` is NULL or empty
+
+This prevents downstream primary key constraint violations.
+
+### Type Conversion
+All fields are converted to **strings** with `None` preserved for NULL values. No date parsing or numeric conversion is performed by the tap.
+
+**Rationale:** Downstream targets (Redshift, Snowflake, etc.) have more robust type casting capabilities and can handle conversions during COPY operations or with SQL CAST functions.
 
 ## NetSuite Setup
 
-### Required Permissions
+### OAuth Authentication Setup
 
-Ensure the authenticating user/role has:
-1. Access to Transaction, TransactionAccountingLine, Account, and TransactionLine records
-2. SuiteQL query permissions
-3. REST Web Services permission
-4. OAuth Token-based authentication setup
+1. **Create Integration Record** (Setup > Integration > Manage Integrations > New)
+   - Name: "Singer Tap - GL Extract"
+   - State: Enabled
+   - Token-Based Authentication: Checked
+   - Note the **Consumer Key** and **Consumer Secret**
 
-### OAuth Authentication
+2. **Create Access Token** (Setup > Users/Roles > Access Tokens > New)
+   - Application Name: Select your integration
+   - User: Select user with appropriate permissions
+   - Role: Select role with GL access
+   - Note the **Token ID** and **Token Secret**
 
-1. Create an Integration Record in NetSuite
-2. Note the Consumer Key and Consumer Secret
-3. Create an Access Token
-4. Note the Token ID and Token Secret
-5. Use these credentials in your configuration
+3. **Configure User/Role Permissions**
+   - Permissions > Transactions > Find Transaction (View)
+   - Permissions > Reports > SuiteAnalytics Workbook (View)
+   - Permissions > Setup > Access Token Management (View/Edit)
+   - Permissions > Setup > REST Web Services (Full)
+   - Permissions > Setup > SOAP Web Services (Full)
+   - Permissions > Setup > User Access Tokens (Full)
+
+### Required Data Access
+
+The integration user/role must have access to:
+- `Transaction` records (all transaction types)
+- `TransactionAccountingLine` records
+- `Account` records (chart of accounts)
+- `TransactionLine` records
+- `PostingPeriod` records
+
+### Testing Your Setup
+
+Verify OAuth credentials work:
+
+```bash
+# Run discovery - this will authenticate and query schema
+tap-netsuite-general-ledger --config sample_config.json --discover
+```
+
+If authentication fails, you'll see OAuth signature errors or 401 responses.
+
+## Troubleshooting
+
+### Common Issues
+
+**401 Unauthorized / OAuth Signature Invalid**
+- Verify all OAuth credentials are correct
+- Ensure token/integration is not disabled in NetSuite
+- Check that user/role has REST Web Services permission
+
+**No Records Returned**
+- Verify you have posted transactions in NetSuite
+- Check that `last_modified_date` (if used) is not too recent
+- Ensure user has access to the transaction records
+
+**Offset Limit Errors**
+- Should be handled automatically by ID-based chunking
+- If errors persist, reduce `page_size` to 500
+
+**Memory Issues**
+- Reduce `batch_size` from 100000 to 50000 or lower
+- Ensure sufficient system memory (recommend 4GB+ for large datasets)
+
+**Broken Pipe Errors**
+- Usually indicates the target process terminated
+- Check target logs for schema mismatches or constraint violations
+- Verify catalog schema matches target table schema
+
+### Debug Logging
+
+For detailed logging, set the log level:
+
+```bash
+export LOGGING_LEVEL=DEBUG
+tap-netsuite-general-ledger --config sample_config.json --catalog catalog.json
+```
 
 ## Development
 
-Install development dependencies:
+### Install for Development
 
 ```bash
-pip install -e ".[dev]"
+git clone https://github.com/ModernAnimal/tap-netsuite-general-ledger.git
+cd tap-netsuite-general-ledger
+pip install -e .
 ```
 
-Run tests:
+### Project Structure
+
+```
+tap-netsuite-general-ledger/
+├── tap_netsuite_general_ledger/
+│   ├── __init__.py          # Main entry point
+│   ├── client.py            # NetSuite SuiteQL API client
+│   ├── discover.py          # Schema discovery
+│   ├── sync.py              # Data extraction and transformation
+│   └── schemas/             # JSON schema definitions
+│       └── netsuite_general_ledger_detail.json
+├── setup.py                 # Package configuration
+├── requirements.txt         # Dependencies
+├── sample_config.json       # Example configuration
+└── README.md               # This file
+```
+
+### Dependencies
+
+- `singer-python>=5.0.0` - Singer specification implementation
+- `aiohttp>=3.8.0` - Async HTTP client for NetSuite API
+
+### Running Tests
 
 ```bash
+# Install test dependencies
+pip install pytest pytest-asyncio
+
+# Run tests
 pytest
 ```
 
@@ -198,17 +369,38 @@ This project is licensed under the GNU General Public License v3.0 - see the LIC
 
 ## Contributing
 
+Contributions are welcome! Please:
+
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
+2. Create a feature branch (`git checkout -b feature/my-new-feature`)
+3. Make your changes with clear commit messages
 4. Add tests if applicable
-5. Submit a pull request
+5. Ensure all tests pass
+6. Submit a pull request
 
 ## Support
 
 For issues and questions:
 
-1. Check the existing issues on GitHub
-2. Create a new issue with detailed information
-3. Include sample configuration (without credentials)
-4. Include relevant log output
+1. Check existing [GitHub Issues](https://github.com/ModernAnimal/tap-netsuite-general-ledger/issues)
+2. Create a new issue with:
+   - Detailed description of the problem
+   - Sample configuration (without credentials!)
+   - Relevant log output
+   - NetSuite version/environment details
+
+## Changelog
+
+### v0.1.0 (Current)
+- Complete rewrite to use SuiteQL REST API instead of RESTlet
+- OAuth 1.0a HMAC-SHA256 authentication
+- Memory-optimized streaming for large datasets
+- ID-based chunking to handle >100k record datasets
+- All fields returned as strings for flexible type casting
+- Composite primary key support
+- Incremental sync via `last_modified_date`
+- Enhanced error handling and validation
+
+## Credits
+
+Built with ❤️ by [Modern Animal](https://github.com/ModernAnimal) for the Singer/Meltano community.

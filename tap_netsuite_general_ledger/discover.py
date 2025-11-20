@@ -54,7 +54,7 @@ def get_gl_detail_schema() -> Dict[str, Any]:
                 "type": ["null", "string"],
                 "description": "Transaction accounting line ID"
             },
-            "internalid": {
+            "internal_id": {
                 "type": ["null", "string"],
                 "description": "Internal ID of the transaction"
             },
@@ -142,7 +142,7 @@ def discover_streams(config: Dict[str, Any]) -> Catalog:
         tap_stream_id="netsuite_general_ledger_detail",
         stream="netsuite_general_ledger_detail",
         schema=gl_detail_schema,
-        key_properties=["internalid", "trans_acct_line_id"],
+        key_properties=["internal_id", "transaction_id", "trans_acct_line_id"],
         metadata=gl_detail_metadata
     )
 
