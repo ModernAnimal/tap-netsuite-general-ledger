@@ -2,121 +2,198 @@
   "type": "object",
   "properties": {
     "posting_period": {
-      "type": ["null", "string"],
+      "type": [
+        "null",
+        "string"
+      ],
       "description": "Posting period name (display format)"
     },
     "posting_period_id": {
-      "type": ["null", "integer"],
+      "type": [
+        "null",
+        "integer"
+      ],
       "description": "Posting period internal ID"
     },
     "created_date": {
-      "type": ["null", "string"],
+      "type": [
+        "null",
+        "string"
+      ],
       "format": "date-time",
-      "description": "Date created (ISO 8601 format)"
+      "description": "Date created (ISO 8601 format with timezone)"
     },
     "trans_acct_line_last_modified": {
-      "type": ["null", "string"],
+      "type": [
+        "null",
+        "string"
+      ],
       "format": "date",
       "description": "Transaction accounting line last modified date (YYYY-MM-DD)"
     },
     "transaction_last_modified": {
-      "type": ["null", "string"],
+      "type": [
+        "null",
+        "string"
+      ],
       "format": "date",
       "description": "Transaction last modified date (YYYY-MM-DD)"
     },
     "account_last_modified": {
-      "type": ["null", "string"],
+      "type": [
+        "null",
+        "string"
+      ],
       "format": "date",
       "description": "Account last modified date (YYYY-MM-DD)"
     },
     "posting": {
-      "type": ["null", "string"],
+      "type": [
+        "null",
+        "string"
+      ],
       "description": "Posting flag (T/F)"
     },
     "approval": {
-      "type": ["null", "string"],
+      "type": [
+        "null",
+        "string"
+      ],
       "description": "Approval status"
     },
     "transaction_date": {
-      "type": ["null", "string"],
+      "type": [
+        "null",
+        "string"
+      ],
       "format": "date",
       "description": "Transaction date (YYYY-MM-DD)"
     },
     "transaction_id": {
-      "type": ["null", "string"],
-      "description": "Transaction ID (e.g., IR10028761)"
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "Transaction ID (e.g., DEP10020469)"
     },
     "trans_acct_line_id": {
-      "type": ["null", "integer"],
+      "type": [
+        "null",
+        "integer"
+      ],
       "description": "Transaction accounting line ID"
     },
     "internal_id": {
-      "type": ["null", "integer"],
+      "type": [
+        "null",
+        "integer"
+      ],
       "description": "Internal ID of the transaction"
     },
     "entity_name": {
-      "type": ["null", "string"],
+      "type": [
+        "null",
+        "string"
+      ],
       "description": "Entity name"
     },
     "trans_memo": {
-      "type": ["null", "string"],
+      "type": [
+        "null",
+        "string"
+      ],
       "description": "Transaction memo"
     },
     "trans_line_memo": {
-      "type": ["null", "string"],
+      "type": [
+        "null",
+        "string"
+      ],
       "description": "Transaction line memo"
     },
     "transaction_type": {
-      "type": ["null", "string"],
-      "description": "Transaction type (e.g., Item Receipt, Journal Entry)"
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "Transaction type (e.g., Deposit, Journal, Bill Payment)"
     },
     "acct_id": {
-      "type": ["null", "integer"],
+      "type": [
+        "null",
+        "integer"
+      ],
       "description": "Account ID"
     },
     "account_group": {
-      "type": ["null", "integer"],
+      "type": [
+        "null",
+        "integer"
+      ],
       "description": "Account group (parent account ID)"
     },
     "department": {
-      "type": ["null", "integer"],
+      "type": [
+        "null",
+        "integer"
+      ],
       "description": "Department ID"
     },
     "class": {
-      "type": ["null", "integer"],
+      "type": [
+        "null",
+        "integer"
+      ],
       "description": "Class ID"
     },
     "location": {
-      "type": ["null", "integer"],
+      "type": [
+        "null",
+        "integer"
+      ],
       "description": "Location ID"
     },
     "debit": {
-      "type": ["null", "number"],
+      "type": [
+        "null",
+        "number"
+      ],
       "description": "Debit amount"
     },
     "credit": {
-      "type": ["null", "number"],
+      "type": [
+        "null",
+        "number"
+      ],
       "description": "Credit amount"
     },
     "net_amount": {
-      "type": ["null", "number"],
+      "type": [
+        "null",
+        "number"
+      ],
       "description": "Net amount (debit - credit)"
     },
     "subsidiary": {
-      "type": ["null", "string"],
+      "type": [
+        "null",
+        "string"
+      ],
       "description": "Subsidiary name"
     },
     "document_number": {
-      "type": ["null", "string"],
+      "type": [
+        "null",
+        "string"
+      ],
       "description": "Document number"
     },
     "status": {
-      "type": ["null", "string"],
+      "type": [
+        "null",
+        "string"
+      ],
       "description": "Transaction status"
-    },
-    "links": {
-      "type": ["null", "string"],
-      "description": "Related links (JSON array as string)"
     }
   }
 }
