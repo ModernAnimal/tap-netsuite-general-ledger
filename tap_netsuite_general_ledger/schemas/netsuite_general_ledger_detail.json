@@ -37,7 +37,7 @@
       "type": ["null", "string"],
       "description": "Transaction accounting line ID"
     },
-    "internalid": {
+    "internal_id": {
       "type": ["null", "string"],
       "description": "Internal ID of the transaction"
     },
