@@ -159,7 +159,9 @@ All fields are returned as **strings** for flexibility. Type casting should be h
 | `posting_period` | string | Posting period name | `BUILTIN.DF(Transaction.PostingPeriod)` |
 | `posting_period_id` | string | Posting period internal ID | `Transaction.PostingPeriod` |
 | `created_date` | string | Record creation datetime | `Transaction.createdDateTime` |
-| `last_modified` | string | Last modified datetime | `TransactionAccountingLine.lastmodifieddate` |
+| `trans_acct_line_last_modified` | string | Transaction accounting line last modified datetime | `TransactionAccountingLine.lastmodifieddate` |
+| `transaction_last_modified` | string | Transaction last modified datetime | `Transaction.lastmodifieddate` |
+| `account_last_modified` | string | Account last modified datetime | `Account.lastmodifieddate` |
 | `posting` | string | Posting flag (T/F) | `Transaction.Posting` |
 | `approval` | string | Approval status | `BUILTIN.DF(Transaction.approvalStatus)` |
 | `entity_name` | string | Entity/customer/vendor name | `BUILTIN.DF(Transaction.Entity)` |
