@@ -219,13 +219,12 @@ def _sync_stream_page_by_page(
                             LOGGER.error(
                                 f"Problem record - "
                                 f"internal_id: {record.get('internal_id')}, "
-                                f"trans_acct_line_id: "
-                                f"{record.get('trans_acct_line_id')}"
+                                f"trans_acct_line_id: {record.get('trans_acct_line_id')}, "
+                                f"{record.get('trans_acct_line_id')}, "
+                                f"transaction_id: {record.get('transaction_id')}"
                             )
                             # Log record data for debugging
                             record_str = json.dumps(record)
-                            if len(record_str) > 500:
-                                record_str = record_str[:500] + "..."
                             LOGGER.error(f"Record data: {record_str}")
                             raise
 

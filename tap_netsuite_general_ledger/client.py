@@ -135,7 +135,7 @@ class NetSuiteClient:
         SELECT
             t.ID AS internal_id,
             t.Trandate AS transaction_date,
-            t.TranID AS transaction_id,
+            coalesce(t.TranID, 'NULL') AS transaction_id,
             tal.TransactionLine AS trans_acct_line_id,
             BUILTIN.DF(t.PostingPeriod) AS posting_period,
             t.PostingPeriod AS posting_period_id,
