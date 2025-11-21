@@ -179,7 +179,6 @@ class NetSuiteClient:
                 ( tal.Debit IS NOT NULL )
                 OR ( tal.Credit IS NOT NULL )
             )
-            AND t.ID = 207037
         """
 
         # Add ID filter if chunking (to handle offset limit)
