@@ -49,17 +49,33 @@ def transform_record(
         'internal_id', 'acct_id', 'posting_period_id', 'trans_acct_line_id',
         'account_group', 'department', 'class', 'location'
     }
-    
+
     # Fields that should be floats
     float_fields = {'debit', 'credit', 'net_amount'}
-    
+
+    # All expected fields from the schema (to ensure they exist even if NULL)
+    all_expected_fields = {
+        'posting_period', 'posting_period_id', 'created_date',
+        'trans_acct_line_last_modified', 'transaction_last_modified',
+        'account_last_modified', 'posting', 'approval', 'transaction_date',
+        'transaction_id', 'trans_acct_line_id', 'internal_id', 'entity_name',
+        'trans_memo', 'trans_line_memo', 'transaction_type', 'acct_id',
+        'account_group', 'department', 'class', 'location', 'debit', 'credit',
+        'net_amount', 'subsidiary', 'document_number', 'status'
+    }
+
     transformed = {}
-    
+
+    # First, initialize all expected fields to None
+    for field in all_expected_fields:
+        transformed[field] = None
+
+    # Then process the actual record data
     for field, value in record.items():
         # Skip the 'links' field entirely (not needed)
         if field == 'links':
             continue
-            
+
         # Convert numeric fields
         if field in int_fields:
             transformed[field] = safe_int(value)
@@ -68,7 +84,7 @@ def transform_record(
         else:
             # Everything else stays as string (or None if empty)
             transformed[field] = None if value == '' else value
-    
+
     # Validate required fields
     if transformed.get('trans_acct_line_id') is None:
         LOGGER.warning(
@@ -76,14 +92,14 @@ def transform_record(
             f"internal_id={transformed.get('internal_id')}"
         )
         return None
-    
+
     if transformed.get('internal_id') is None:
         LOGGER.warning(
             f"Skipping record with NULL/empty internal_id: "
             f"trans_acct_line_id={transformed.get('trans_acct_line_id')}"
         )
         return None
-    
+
     return transformed
 
 

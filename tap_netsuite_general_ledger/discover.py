@@ -67,15 +67,15 @@ def get_gl_detail_schema() -> Dict[str, Any]:
                 "description": "Transaction date (as returned by NetSuite API)"
             },
             "transaction_id": {
-                "type": ["null", "string"],
+                "type": "string",
                 "description": "Transaction ID (e.g., DEP10020469)"
             },
             "trans_acct_line_id": {
-                "type": ["null", "integer"],
+                "type": "integer",
                 "description": "Transaction accounting line ID"
             },
             "internal_id": {
-                "type": ["null", "integer"],
+                "type": "integer",
                 "description": "Internal ID of the transaction"
             },
             "entity_name": {
