@@ -205,22 +205,14 @@ class NetSuiteClient:
 
         return query
 
-    async def fetch_gl_data_streaming(
-        self,
-        batch_callback,
-        batch_size: int = 100000
-    ) -> int:
-        """Fetch GL data from NetSuite SuiteQL with pagination and streaming
+    async def fetch_gl_data_pages(self):
+        """Fetch GL data from NetSuite SuiteQL page by page
 
-        Handles the SuiteQL offset limit of 99,000 by using ID-based chunking
-        when necessary.
+        Yields pages of records as they are fetched. Handles NetSuite's
+        offset limit of 99,000 by using ID-based chunking when necessary.
 
-        Args:
-            batch_callback: Async function to call with each batch of records
-            batch_size: Size of each batch to process (default: 100000)
-
-        Returns:
-            Total number of records processed
+        Yields:
+            List[Dict[str, Any]]: A page of records (up to page_size)
         """
 
         LOGGER.info("Starting SuiteQL data fetch")
@@ -229,16 +221,15 @@ class NetSuiteClient:
         else:
             LOGGER.info("Using full refresh mode")
 
-        all_records = []
-        total_processed = 0
         last_internal_id = 0
         chunk_num = 1
         max_offset = 99000  # NetSuite's maximum offset limit
+        total_fetched = 0
 
         # Fetch data in chunks when needed (due to offset limit)
         while True:
             LOGGER.info(
-                f"Processing chunk {chunk_num} "
+                f"Fetching chunk {chunk_num} "
                 f"(starting from internal ID > {last_internal_id})"
             )
 
@@ -246,14 +237,14 @@ class NetSuiteClient:
             query = self.build_gl_query(min_internal_id=last_internal_id)
 
             offset = 0
-            page = 1
-            chunk_records = []
+            page_num = 1
+            chunk_has_records = False
 
             # Fetch pages within this chunk (up to offset limit)
             while offset <= max_offset:
                 LOGGER.info(
-                    f"Fetching page {page} (offset: {offset}, "
-                    f"limit: {self.page_size})..."
+                    f"Fetching page {page_num} "
+                    f"(offset: {offset}, limit: {self.page_size})..."
                 )
 
                 records = await self._fetch_page(query, offset, self.page_size)
@@ -262,35 +253,17 @@ class NetSuiteClient:
                     LOGGER.info("No more records in this chunk")
                     break
 
-                chunk_records.extend(records)
-                all_records.extend(records)
+                chunk_has_records = True
+                total_fetched += len(records)
+                last_internal_id = int(records[-1].get('internal_id', 0))
+
                 LOGGER.info(
-                    f"Retrieved {len(records)} records "
-                    f"(Chunk total: {len(chunk_records)}, "
-                    f"Overall total: {len(all_records)})"
+                    f"Fetched {len(records)} records "
+                    f"(Total so far: {total_fetched})"
                 )
 
-                # Check if we have enough records to process a batch
-                if len(all_records) >= batch_size:
-                    # Process a batch
-                    batch = all_records[:batch_size]
-                    remaining = all_records[batch_size:]
-
-                    await batch_callback(
-                        batch,
-                        page,
-                        None,  # total_batches unknown
-                        f"SuiteQL query (chunk {chunk_num})"
-                    )
-
-                    total_processed += len(batch)
-
-                    # Clear processed records and keep remaining
-                    all_records = remaining
-
-                    # Force garbage collection
-                    import gc
-                    gc.collect()
+                # Yield this page immediately for processing
+                yield records
 
                 # Check if this was the last page of results
                 if len(records) < self.page_size:
@@ -298,7 +271,7 @@ class NetSuiteClient:
                     break
 
                 offset += self.page_size
-                page += 1
+                page_num += 1
 
                 # Check if we're approaching the offset limit
                 if offset > max_offset:
@@ -307,50 +280,22 @@ class NetSuiteClient:
                     )
                     break
 
-            # If we fetched records in this chunk, prepare for next chunk
-            if chunk_records:
-                # Get the last internal ID from this chunk for next iteration
-                last_record = chunk_records[-1]
-                last_internal_id = int(last_record.get('internal_id', 0))
-
-                LOGGER.info(
-                    f"Chunk {chunk_num} complete: {len(chunk_records)} "
-                    f"records fetched. Last internal ID: {last_internal_id}"
-                )
-
-                # If we hit the offset limit, continue with next chunk
-                if offset > max_offset and len(records) == self.page_size:
-                    chunk_num += 1
-                    LOGGER.info(
-                        f"Continuing to next chunk "
-                        f"(ID filter: internal_id > {last_internal_id})"
-                    )
-                    continue
-                else:
-                    # This was the final chunk
-                    break
-            else:
-                # No records in this chunk, we're done
+            # If no records in this chunk, we're done
+            if not chunk_has_records:
                 break
 
-        # Process any remaining records
-        if all_records:
-            LOGGER.info(
-                f"Processing final batch of {len(all_records)} records"
-            )
-            await batch_callback(
-                all_records,
-                page,
-                None,
-                "SuiteQL query (final)"
-            )
-            total_processed += len(all_records)
-            all_records.clear()
-            import gc
-            gc.collect()
+            # If we hit offset limit and got full page, continue next chunk
+            if offset > max_offset and len(records) == self.page_size:
+                chunk_num += 1
+                LOGGER.info(
+                    f"Continuing to next chunk "
+                    f"(ID filter: internal_id > {last_internal_id})"
+                )
+            else:
+                # This was the final chunk
+                break
 
-        LOGGER.info(f"Total records processed: {total_processed}")
-        return total_processed
+        LOGGER.info(f"Total records fetched: {total_fetched}")
 
     async def _fetch_page(
         self,

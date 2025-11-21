@@ -29,8 +29,7 @@ REQUIRED_CONFIG_KEYS = [
 
 OPTIONAL_CONFIG_KEYS = [
     "last_modified_date",
-    "page_size",
-    "batch_size"
+    "page_size"
 ]
 
 

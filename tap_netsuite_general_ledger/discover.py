@@ -16,10 +16,7 @@ def get_gl_detail_schema() -> Dict[str, Any]:
     - Integer fields: internal_id, posting_period_id, trans_acct_line_id,
                       acct_id, account_group, department, class, location
     - Number fields: debit, credit, net_amount
-    - Date fields: transaction_date, account_last_modified,
-                   trans_acct_line_last_modified, transaction_last_modified
-    - Datetime fields: created_date
-    - String fields: all others
+    - String fields: all others (including dates as returned by NetSuite API)
     """
     return {
         "type": "object",
@@ -34,26 +31,28 @@ def get_gl_detail_schema() -> Dict[str, Any]:
             },
             "created_date": {
                 "type": ["null", "string"],
-                "format": "date-time",
-                "description": "Date created (ISO 8601 format with timezone)"
+                "description": "Date created (as returned by NetSuite API)"
             },
             "trans_acct_line_last_modified": {
                 "type": ["null", "string"],
-                "format": "date",
                 "description": (
-                    "Transaction accounting line last modified "
-                    "date (YYYY-MM-DD)"
+                    "Transaction accounting line last modified date "
+                    "(as returned by NetSuite API)"
                 )
             },
             "transaction_last_modified": {
                 "type": ["null", "string"],
-                "format": "date",
-                "description": "Transaction last modified date (YYYY-MM-DD)"
+                "description": (
+                    "Transaction last modified date "
+                    "(as returned by NetSuite API)"
+                )
             },
             "account_last_modified": {
                 "type": ["null", "string"],
-                "format": "date",
-                "description": "Account last modified date (YYYY-MM-DD)"
+                "description": (
+                    "Account last modified date "
+                    "(as returned by NetSuite API)"
+                )
             },
             "posting": {
                 "type": ["null", "string"],
@@ -65,8 +64,7 @@ def get_gl_detail_schema() -> Dict[str, Any]:
             },
             "transaction_date": {
                 "type": ["null", "string"],
-                "format": "date",
-                "description": "Transaction date (YYYY-MM-DD)"
+                "description": "Transaction date (as returned by NetSuite API)"
             },
             "transaction_id": {
                 "type": ["null", "string"],

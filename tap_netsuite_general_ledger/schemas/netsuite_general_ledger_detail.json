@@ -20,32 +20,28 @@
         "null",
         "string"
       ],
-      "format": "date-time",
-      "description": "Date created (ISO 8601 format with timezone)"
+      "description": "Date created (as returned by NetSuite API)"
     },
     "trans_acct_line_last_modified": {
       "type": [
         "null",
         "string"
       ],
-      "format": "date",
-      "description": "Transaction accounting line last modified date (YYYY-MM-DD)"
+      "description": "Transaction accounting line last modified date (as returned by NetSuite API)"
     },
     "transaction_last_modified": {
       "type": [
         "null",
         "string"
       ],
-      "format": "date",
-      "description": "Transaction last modified date (YYYY-MM-DD)"
+      "description": "Transaction last modified date (as returned by NetSuite API)"
     },
     "account_last_modified": {
       "type": [
         "null",
         "string"
       ],
-      "format": "date",
-      "description": "Account last modified date (YYYY-MM-DD)"
+      "description": "Account last modified date (as returned by NetSuite API)"
     },
     "posting": {
       "type": [
@@ -66,8 +62,7 @@
         "null",
         "string"
       ],
-      "format": "date",
-      "description": "Transaction date (YYYY-MM-DD)"
+      "description": "Transaction date (as returned by NetSuite API)"
     },
     "transaction_id": {
       "type": [
