@@ -16,11 +16,12 @@ LOGGER = singer.get_logger()
 
 
 def convert_to_number(value: Any) -> Any:
-    """Convert value to number if possible"""
+    """Convert value to number if possible, preserving zero values"""
+    # Only return None for actual None or empty string
     if value is None or value == '':
         return None
 
-    # If already a number, return as-is
+    # If already a number, return as-is (including 0 and 0.0)
     if isinstance(value, (int, float)):
         return value
 
@@ -30,35 +31,69 @@ def convert_to_number(value: Any) -> Any:
             # Remove common formatting characters
             cleaned = value.replace(',', '').replace('$', '').strip()
 
-            # Try to convert to decimal
+            # After cleaning, check if empty
+            if cleaned == '':
+                return None
+
+            # Try to convert to number
             if '.' in cleaned or 'e' in cleaned.lower():
                 return float(cleaned)
             else:
                 return int(cleaned)
-        except (ValueError, InvalidOperation):
-            return None
+        except (ValueError, InvalidOperation, AttributeError):
+            # If conversion fails, return the original value as string
+            # This preserves the data rather than losing it
+            return str(value)
 
-    return None
+    # For any other type, convert to string to preserve data
+    return str(value)
 
 
 def convert_to_integer(value: Any) -> Any:
-    """Convert value to integer if possible"""
+    """Convert value to integer if possible, preserving zero values"""
+    # Only return None for actual None or empty string
     if value is None or value == '':
         return None
 
-    # If already an integer, return as-is
+    # If already an integer, return as-is (including 0)
     if isinstance(value, int):
         return value
 
-    # Try to convert to integer
-    try:
+    # If it's a float, convert to int (including 0.0 -> 0)
+    if isinstance(value, float):
         return int(value)
-    except (ValueError, TypeError):
-        return None
+
+    # Try to convert string to integer
+    if isinstance(value, str):
+        try:
+            # Strip whitespace first
+            cleaned = value.strip()
+
+            # After cleaning, check if empty
+            if cleaned == '':
+                return None
+
+            # Try direct conversion
+            return int(cleaned)
+        except (ValueError, TypeError, AttributeError):
+            # Try to convert to float first, then to int
+            try:
+                return int(float(cleaned))
+            except (ValueError, TypeError, AttributeError):
+                # If conversion fails, return original value as string
+                # This preserves the data rather than losing it
+                return str(value)
+
+    # For any other type, convert to string to preserve data
+    return str(value)
 
 
 def format_date(date_str: Any) -> str:
-    """Format date string to ISO format (YYYY-MM-DD)"""
+    """Format date string to ISO format (YYYY-MM-DD)
+    
+    Preserves non-null values by returning original if parsing fails
+    """
+    # Only return None for actual None or empty string
     if date_str is None or date_str == '':
         return None
 
@@ -86,21 +121,31 @@ def format_date(date_str: Any) -> str:
                 except ValueError:
                     continue
 
-            # If no format matches, log and return None
-            LOGGER.warning(f"Unable to parse date: {date_str}")
-            return None
+            # If no format matches, log and return original value
+            # This preserves data rather than losing it
+            LOGGER.warning(
+                f"Unable to parse date: {date_str}, "
+                f"returning original value"
+            )
+            return str(date_str)
 
         except Exception as e:
             LOGGER.warning(
-                f"Date formatting error: {str(e)} for value: {date_str}"
+                f"Date formatting error: {str(e)} for value: {date_str}, "
+                f"returning original value"
             )
-            return None
+            return str(date_str)
 
-    return None
+    # For non-string types, convert to string to preserve data
+    return str(date_str)
 
 
 def format_datetime(datetime_str: Any) -> str:
-    """Format datetime string to ISO format with timezone"""
+    """Format datetime string to ISO format with timezone
+    
+    Preserves non-null values by returning original if parsing fails
+    """
+    # Only return None for actual None or empty string
     if datetime_str is None or datetime_str == '':
         return None
 
@@ -129,18 +174,23 @@ def format_datetime(datetime_str: Any) -> str:
                 except ValueError:
                     continue
 
-            # If no format matches, log and return None
-            LOGGER.warning(f"Unable to parse datetime: {datetime_str}")
-            return None
+            # If no format matches, log and return original value
+            # This preserves data rather than losing it
+            LOGGER.warning(
+                f"Unable to parse datetime: {datetime_str}, "
+                f"returning original value"
+            )
+            return str(datetime_str)
 
         except Exception as e:
             LOGGER.warning(
                 f"Datetime formatting error: {str(e)} "
-                f"for value: {datetime_str}"
+                f"for value: {datetime_str}, returning original value"
             )
-            return None
+            return str(datetime_str)
 
-    return None
+    # For non-string types, convert to string to preserve data
+    return str(datetime_str)
 
 
 def transform_record(
