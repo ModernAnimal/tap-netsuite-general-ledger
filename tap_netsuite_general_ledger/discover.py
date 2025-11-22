@@ -10,115 +10,136 @@ from singer import Schema, CatalogEntry, Catalog
 
 
 def get_gl_detail_schema() -> Dict[str, Any]:
-    """Get the schema for GL detail records"""
+    """Get the schema for GL detail records from SuiteQL
+
+    Schema matches the data types output by sync.py transform_record function:
+    - Integer fields: internal_id, posting_period_id, trans_acct_line_id,
+                      acct_id, account_group, department, class, location
+    - Number fields: debit, credit, net_amount
+    - String fields: all others (including dates as returned by NetSuite API)
+    """
     return {
         "type": "object",
         "properties": {
-            "internal_id": {
+            "posting_period": {
                 "type": ["null", "string"],
+                "description": "Posting period name (display format)"
+            },
+            "posting_period_id": {
+                "type": ["null", "integer"],
+                "description": "Posting period internal ID"
+            },
+            "created_date": {
+                "type": ["null", "string"],
+                "description": "Date created (as returned by NetSuite API)"
+            },
+            "trans_acct_line_last_modified": {
+                "type": ["null", "string"],
+                "description": (
+                    "Transaction accounting line last modified date "
+                    "(as returned by NetSuite API)"
+                )
+            },
+            "transaction_last_modified": {
+                "type": ["null", "string"],
+                "description": (
+                    "Transaction last modified date "
+                    "(as returned by NetSuite API)"
+                )
+            },
+            "account_last_modified": {
+                "type": ["null", "string"],
+                "description": (
+                    "Account last modified date "
+                    "(as returned by NetSuite API)"
+                )
+            },
+            "posting": {
+                "type": ["null", "string"],
+                "description": "Posting flag (T/F)"
+            },
+            "approval": {
+                "type": ["null", "string"],
+                "description": "Approval status"
+            },
+            "transaction_date": {
+                "type": ["null", "string"],
+                "description": "Transaction date (as returned by NetSuite API)"
+            },
+            "transaction_id": {
+                "type": ["null", "string"],
+                "description": "Transaction ID (e.g., DEP10020469)"
+            },
+            "trans_acct_line_id": {
+                "type": "integer",
+                "description": "Transaction accounting line ID"
+            },
+            "internal_id": {
+                "type": "integer",
                 "description": "Internal ID of the transaction"
+            },
+            "entity_name": {
+                "type": ["null", "string"],
+                "description": "Entity name"
+            },
+            "trans_memo": {
+                "type": ["null", "string"],
+                "description": "Transaction memo"
+            },
+            "trans_line_memo": {
+                "type": ["null", "string"],
+                "description": "Transaction line memo"
+            },
+            "transaction_type": {
+                "type": ["null", "string"],
+                "description": (
+                    "Transaction type "
+                    "(e.g., Deposit, Journal, Bill Payment)"
+                )
+            },
+            "acct_id": {
+                "type": ["null", "integer"],
+                "description": "Account ID"
+            },
+            "account_group": {
+                "type": ["null", "integer"],
+                "description": "Account group (parent account ID)"
+            },
+            "department": {
+                "type": ["null", "integer"],
+                "description": "Department ID"
+            },
+            "class": {
+                "type": ["null", "integer"],
+                "description": "Class ID"
+            },
+            "location": {
+                "type": ["null", "integer"],
+                "description": "Location ID"
+            },
+            "debit": {
+                "type": ["null", "number"],
+                "description": "Debit amount"
+            },
+            "credit": {
+                "type": ["null", "number"],
+                "description": "Credit amount"
+            },
+            "net_amount": {
+                "type": ["null", "number"],
+                "description": "Net amount (debit - credit)"
+            },
+            "subsidiary": {
+                "type": ["null", "string"],
+                "description": "Subsidiary name"
             },
             "document_number": {
                 "type": ["null", "string"],
                 "description": "Document number"
             },
-            "type": {
-                "type": ["null", "string"],
-                "description": "Transaction type"
-            },
-            "journal_name": {
-                "type": ["null", "string"],
-                "description": "Journal name"
-            },
-            "date": {
-                "type": ["null", "string"],
-                "format": "date-time",
-                "description": "Transaction date"
-            },
-            "period": {
-                "type": ["null", "string"],
-                "description": "Posting period"
-            },
-            "subsidiary": {
-                "type": ["null", "string"],
-                "description": "Subsidiary"
-            },
-            "account": {
-                "type": ["null", "string"],
-                "description": "Account"
-            },
-            "amount_debit": {
-                "type": ["null", "number"],
-                "description": "Debit amount"
-            },
-            "amount_credit": {
-                "type": ["null", "number"],
-                "description": "Credit amount"
-            },
-            "amount_net": {
-                "type": ["null", "number"],
-                "description": "Net amount"
-            },
-            "amount_transaction_total": {
-                "type": ["null", "number"],
-                "description": "Transaction total amount"
-            },
-            "class": {
-                "type": ["null", "string"],
-                "description": "Class"
-            },
-            "location": {
-                "type": ["null", "string"],
-                "description": "Location"
-            },
-            "department": {
-                "type": ["null", "string"],
-                "description": "Department"
-            },
-            "name_line": {
-                "type": ["null", "string"],
-                "description": "Line name"
-            },
-            "memo_main": {
-                "type": ["null", "string"],
-                "description": "Main memo"
-            },
-            "memo_line": {
-                "type": ["null", "string"],
-                "description": "Line memo"
-            },
             "status": {
                 "type": ["null", "string"],
-                "description": "Status"
-            },
-            "approval_status": {
-                "type": ["null", "string"],
-                "description": "Approval status"
-            },
-            "date_created": {
-                "type": ["null", "string"],
-                "format": "date-time",
-                "description": "Date created"
-            },
-            "created_by": {
-                "type": ["null", "string"],
-                "description": "Created by"
-            },
-            "name": {
-                "type": ["null", "string"],
-                "description": "Name"
-            },
-            "posting": {
-                "type": ["null", "string"],
-                "description": "Posting"
-            },
-            "company_name": {
-                "type": ["null", "string"],
-                "description": "Company name"
-            },
-            "transaction_line_id": {
-                "type": ["null", "string"],
-                "description": "Transaction line ID"
+                "description": "Transaction status"
             }
         }
     }
@@ -144,7 +165,7 @@ def discover_streams(config: Dict[str, Any]) -> Catalog:
         tap_stream_id="netsuite_general_ledger_detail",
         stream="netsuite_general_ledger_detail",
         schema=gl_detail_schema,
-        key_properties=["internal_id", "transaction_line_id"],
+        key_properties=["internal_id", "trans_acct_line_id"],
         metadata=gl_detail_metadata
     )
 

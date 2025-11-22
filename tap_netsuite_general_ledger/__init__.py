@@ -28,11 +28,8 @@ REQUIRED_CONFIG_KEYS = [
 ]
 
 OPTIONAL_CONFIG_KEYS = [
-    "netsuite_script_id",
-    "netsuite_deploy_id",
-    "netsuite_search_id",
-    "period_ids",
-    "period_names"
+    "last_modified_date",
+    "page_size"
 ]
 
 
