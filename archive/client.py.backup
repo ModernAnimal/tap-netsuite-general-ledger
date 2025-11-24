@@ -418,8 +418,7 @@ class NetSuiteClient:
 
     async def fetch_dimension_table(
         self,
-        stream_name: str,
-        query: str
+        stream_name: str
     ) -> List[Dict[str, Any]]:
         """Fetch all data for a dimension table
 
@@ -428,11 +427,18 @@ class NetSuiteClient:
 
         Args:
             stream_name: Name of the stream/table to fetch
-            query: SuiteQL query to execute
 
         Returns:
             List of all records for the table
         """
+        if stream_name not in DIMENSION_TABLE_QUERIES:
+            raise ValueError(
+                f"Unknown dimension table: {stream_name}. "
+                f"Available tables: {list(DIMENSION_TABLE_QUERIES.keys())}"
+            )
+
+        query = DIMENSION_TABLE_QUERIES[stream_name]
+        
         LOGGER.info(f"Fetching dimension table: {stream_name}")
 
         all_records = []
