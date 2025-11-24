@@ -45,6 +45,7 @@ class NetSuiteClient:
         self.page_size = config.get("page_size", 1000)
         self.last_modified_date = config.get("last_modified_date")
         self.concurrent_requests = config.get("concurrent_requests", 5)
+        self.record_batch_size = config.get("record_batch_size", 1000)
 
         # Build SuiteQL URL
         self.base_url = f"https://{self.account}.suitetalk.api.netsuite.com"

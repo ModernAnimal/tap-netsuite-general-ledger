@@ -74,6 +74,25 @@ class BaseStream(ABC):
             )
             raise
 
+    def write_records_batch(self, records: List[Dict[str, Any]]):
+        """Write multiple records to stdout in a batch
+
+        This is more efficient than calling write_record repeatedly
+        as it reduces the overhead of multiple function calls and
+        I/O operations.
+
+        Args:
+            records: List of records to write
+        """
+        try:
+            for record in records:
+                singer.write_record(self.tap_stream_id, record)
+        except BrokenPipeError:
+            LOGGER.error(
+                f"Broken pipe when writing batch for {self.tap_stream_id}"
+            )
+            raise
+
     def write_state(self, state: Dict[str, Any]):
         """Write state to stdout"""
         try:

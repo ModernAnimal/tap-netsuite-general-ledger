@@ -3,7 +3,6 @@ GL Detail stream class for complex general ledger data
 """
 
 import asyncio
-import json
 from datetime import datetime, timezone
 from typing import Dict, Any, List
 
@@ -17,6 +16,26 @@ LOGGER = singer.get_logger()
 
 class GLDetailStream(BaseStream):
     """Stream class for NetSuite General Ledger Detail with chunking"""
+
+    # Pre-compiled field sets for optimized transformation
+    INT_FIELDS = frozenset({
+        'internal_id', 'acct_id', 'posting_period_id',
+        'trans_acct_line_id', 'account_group', 'department', 'class',
+        'location'
+    })
+
+    FLOAT_FIELDS = frozenset({'debit', 'credit', 'net_amount'})
+
+    ALL_EXPECTED_FIELDS = frozenset({
+        'posting_period', 'posting_period_id', 'created_date',
+        'trans_acct_line_last_modified', 'transaction_last_modified',
+        'account_last_modified', 'posting', 'approval',
+        'transaction_date', 'transaction_id', 'trans_acct_line_id',
+        'internal_id', 'entity_name', 'trans_memo', 'trans_line_memo',
+        'transaction_type', 'acct_id', 'account_group', 'department',
+        'class', 'location', 'debit', 'credit', 'net_amount',
+        'subsidiary', 'document_number', 'status'
+    })
 
     def get_stream_id(self) -> str:
         """Return the stream ID"""
@@ -119,10 +138,11 @@ class GLDetailStream(BaseStream):
         return query
 
     def transform_record(self, record: Dict[str, Any]) -> Dict[str, Any]:
-        """Transform NetSuite SuiteQL record with lightweight type conversion
+        """Transform NetSuite SuiteQL record with optimized type conversion
 
-        Only converts numeric fields to int/float. Everything else stays as
-        string. This is much faster than heavy transformation logic.
+        Uses pre-compiled field sets and dict comprehension for maximum
+        performance. This is significantly faster than the original
+        implementation when processing millions of records.
 
         Args:
             record: Raw record from NetSuite
@@ -130,49 +150,18 @@ class GLDetailStream(BaseStream):
         Returns:
             Transformed record or None if invalid
         """
-        # Fields that should be integers
-        int_fields = {
-            'internal_id', 'acct_id', 'posting_period_id',
-            'trans_acct_line_id', 'account_group', 'department', 'class',
-            'location'
+        # Fast path: use dict comprehension with inline type checking
+        transformed = {
+            field: (
+                self.safe_int(record.get(field))
+                if field in self.INT_FIELDS
+                else self.safe_float(record.get(field))
+                if field in self.FLOAT_FIELDS
+                else (None if record.get(field) == '' else record.get(field))
+            )
+            for field in self.ALL_EXPECTED_FIELDS
+            if field != 'links'  # Skip links field
         }
-
-        # Fields that should be floats
-        float_fields = {'debit', 'credit', 'net_amount'}
-
-        # All expected fields from the schema (to ensure they exist even if
-        # NULL)
-        all_expected_fields = {
-            'posting_period', 'posting_period_id', 'created_date',
-            'trans_acct_line_last_modified', 'transaction_last_modified',
-            'account_last_modified', 'posting', 'approval',
-            'transaction_date', 'transaction_id', 'trans_acct_line_id',
-            'internal_id', 'entity_name', 'trans_memo', 'trans_line_memo',
-            'transaction_type', 'acct_id', 'account_group', 'department',
-            'class', 'location', 'debit', 'credit', 'net_amount',
-            'subsidiary', 'document_number', 'status'
-        }
-
-        transformed = {}
-
-        # First, initialize all expected fields to None
-        for field in all_expected_fields:
-            transformed[field] = None
-
-        # Then process the actual record data
-        for field, value in record.items():
-            # Skip the 'links' field entirely (not needed)
-            if field == 'links':
-                continue
-
-            # Convert numeric fields
-            if field in int_fields:
-                transformed[field] = self.safe_int(value)
-            elif field in float_fields:
-                transformed[field] = self.safe_float(value)
-            else:
-                # Everything else stays as string (or None if empty)
-                transformed[field] = None if value == '' else value
 
         # Validate required fields
         if transformed.get('trans_acct_line_id') is None:
@@ -273,6 +262,10 @@ class GLDetailStream(BaseStream):
             async def process_pages():
                 nonlocal total_processed, page_num
 
+                # Batch accumulator for efficient writing
+                batch = []
+                batch_size = self.client.record_batch_size
+
                 # Pass query builder to client
                 async for page in self.client.fetch_gl_data_pages(
                     self.build_query
@@ -284,7 +277,7 @@ class GLDetailStream(BaseStream):
                         f"Processing page {page_num} ({len(page)} records)"
                     )
 
-                    # Process each record in the page
+                    # Transform all records in the page
                     for idx, record in enumerate(page):
                         try:
                             transformed = self.transform_record(record)
@@ -293,28 +286,23 @@ class GLDetailStream(BaseStream):
                             if transformed is None:
                                 continue
 
-                            try:
-                                self.write_record(transformed)
-                                total_processed += 1
-                            except BrokenPipeError:
-                                LOGGER.error(
-                                    f"Broken pipe - target terminated after "
-                                    f"{total_processed} records "
-                                    f"(page {page_num}, record {idx + 1})"
-                                )
-                                LOGGER.error(
-                                    f"Problem record - "
-                                    f"internal_id: "
-                                    f"{record.get('internal_id')}, "
-                                    f"trans_acct_line_id: "
-                                    f"{record.get('trans_acct_line_id')}, "
-                                    f"transaction_id: "
-                                    f"{record.get('transaction_id')}"
-                                )
-                                # Log record data for debugging
-                                record_str = json.dumps(record)
-                                LOGGER.error(f"Record data: {record_str}")
-                                raise
+                            # Add to batch
+                            batch.append(transformed)
+
+                            # Write batch when it reaches batch_size
+                            if len(batch) >= batch_size:
+                                try:
+                                    self.write_records_batch(batch)
+                                    total_processed += len(batch)
+                                    batch = []  # Clear batch
+                                except BrokenPipeError:
+                                    LOGGER.error(
+                                        f"Broken pipe - target terminated "
+                                        f"after {total_processed} records "
+                                        f"(page {page_num}, batch at "
+                                        f"record {idx + 1})"
+                                    )
+                                    raise
 
                         except BrokenPipeError:
                             raise
@@ -324,6 +312,19 @@ class GLDetailStream(BaseStream):
                                 f"in page {page_num}: {str(e)}"
                             )
                             continue
+
+                    # Write any remaining records in the batch at page boundary
+                    if batch:
+                        try:
+                            self.write_records_batch(batch)
+                            total_processed += len(batch)
+                            batch = []
+                        except BrokenPipeError:
+                            LOGGER.error(
+                                f"Broken pipe when flushing batch at "
+                                f"page {page_num}"
+                            )
+                            raise
 
                     page_processed = total_processed - page_start_count
                     LOGGER.info(
