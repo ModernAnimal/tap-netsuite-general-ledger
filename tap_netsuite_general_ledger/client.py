@@ -1,6 +1,15 @@
 """
 NetSuite Client for Singer Tap
 Handles authentication and API requests to NetSuite SuiteQL API
+
+This client is responsible for transport-level concerns only:
+- OAuth 1.0a HMAC-SHA256 authentication
+- HTTP request/response handling
+- Pagination and chunking logic
+- Error handling and retries
+
+The client does NOT define queries or business logic - that belongs
+in the stream classes.
 """
 
 import asyncio
@@ -118,98 +127,15 @@ class NetSuiteClient:
 
         return ', '.join(header_parts)
 
-    def build_gl_query(self, min_internal_id: int = 0) -> str:
-        """Build the SuiteQL query to fetch GL data
-
-        Args:
-            min_internal_id: Minimum internal ID to fetch (for chunking
-                beyond offset limit)
-
-        Returns:
-            SuiteQL query string
-        """
-        # Base query with all fields from original demo
-        # Note: TransactionAccountingLine (tal) has debit/credit/account
-        #       TransactionLine (tl) has department/class/location/memo
-        query = """
-        SELECT
-            t.ID AS internal_id,
-            t.Trandate AS transaction_date,
-            coalesce(t.TranID, 'NULL') AS transaction_id,
-            tal.TransactionLine AS trans_acct_line_id,
-            BUILTIN.DF(t.PostingPeriod) AS posting_period,
-            t.PostingPeriod AS posting_period_id,
-            t.createdDateTime AS created_date,
-            tal.lastmodifieddate AS trans_acct_line_last_modified,
-            t.lastmodifieddate AS transaction_last_modified,
-            a.lastmodifieddate AS account_last_modified,
-            t.Posting AS posting,
-            BUILTIN.DF(t.approvalStatus) AS approval,
-            BUILTIN.DF(t.Entity) AS entity_name,
-            t.memo AS trans_memo,
-            tl.memo AS trans_line_memo,
-            BUILTIN.DF(t.Type) AS transaction_type,
-            tal.Account AS acct_id,
-            a.parent AS account_group,
-            tl.Department AS department,
-            tl.Class AS class,
-            tl.Location AS location,
-            tal.Debit AS debit,
-            tal.Credit AS credit,
-            tal.Amount AS net_amount,
-            BUILTIN.DF(tl.Subsidiary) AS subsidiary,
-            t.Number AS document_number,
-            BUILTIN.DF(t.Status) AS status
-        FROM
-            Transaction t
-        INNER JOIN TransactionAccountingLine tal ON (
-            tal.Transaction = t.ID
-        )
-        INNER JOIN Account a ON (
-            a.ID = tal.Account
-        )
-        LEFT JOIN TransactionLine tl ON (
-            tl.transaction = t.ID
-            AND tl.id = tal.TransactionLine
-        )
-        WHERE
-            ( t.Posting = 'T' )
-            AND ( tal.Posting = 'T' )
-            AND (
-                ( tal.Debit IS NOT NULL )
-                OR ( tal.Credit IS NOT NULL )
-            )
-        """
-
-        # Add ID filter if chunking (to handle offset limit)
-        if min_internal_id > 0:
-            query += f" AND t.ID > {min_internal_id}"
-
-        # Add incremental filter if last_modified_date is set
-        if self.last_modified_date:
-            query += (
-                f"""
-                    AND (
-                        t.lastModifiedDate >=
-                        TO_DATE('{self.last_modified_date}', 'YYYY-MM-DD')
-                        OR tal.lastModifiedDate >=
-                        TO_DATE('{self.last_modified_date}', 'YYYY-MM-DD')
-                        OR a.lastModifiedDate >=
-                        TO_DATE('{self.last_modified_date}', 'YYYY-MM-DD')
-                    )
-                """
-            )
-
-        # Order by transaction ID and line ID for consistent pagination
-        query += "ORDER BY t.id, t.TranDate, t.TranID, tal.TransactionLine"
-
-        return query
-
-    async def fetch_gl_data_pages(self):
+    async def fetch_gl_data_pages(self, query_builder_fn):
         """Fetch GL data from NetSuite SuiteQL page by page
 
         Yields pages of records as they are fetched. Handles NetSuite's
         offset limit of 99,000 by using ID-based chunking when necessary.
+
+        Args:
+            query_builder_fn: Function that takes (min_internal_id,
+                last_modified_date) and returns a SuiteQL query string
 
         Yields:
             List[Dict[str, Any]]: A page of records (up to page_size)
@@ -234,7 +160,7 @@ class NetSuiteClient:
             )
 
             # Build query with ID filter if needed
-            query = self.build_gl_query(min_internal_id=last_internal_id)
+            query = query_builder_fn(last_internal_id, self.last_modified_date)
 
             offset = 0
             page_num = 1

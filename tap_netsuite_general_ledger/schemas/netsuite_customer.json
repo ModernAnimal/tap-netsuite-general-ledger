@@ -12,58 +12,6 @@
     "companyname": {
       "type": ["null", "string"],
       "description": "Company name"
-    },
-    "altname": {
-      "type": ["null", "string"],
-      "description": "Alternative name"
-    },
-    "email": {
-      "type": ["null", "string"],
-      "description": "Email address"
-    },
-    "phone": {
-      "type": ["null", "string"],
-      "description": "Phone number"
-    },
-    "fax": {
-      "type": ["null", "string"],
-      "description": "Fax number"
-    },
-    "balance": {
-      "type": ["null", "number"],
-      "description": "Balance"
-    },
-    "creditlimit": {
-      "type": ["null", "number"],
-      "description": "Credit limit"
-    },
-    "datecreated": {
-      "type": ["null", "string"],
-      "description": "Date created"
-    },
-    "lastmodifieddate": {
-      "type": ["null", "string"],
-      "description": "Last modified date"
-    },
-    "isinactive": {
-      "type": ["null", "string"],
-      "description": "Is inactive flag"
-    },
-    "isperson": {
-      "type": ["null", "string"],
-      "description": "Is person flag"
-    },
-    "subsidiary": {
-      "type": ["null", "integer"],
-      "description": "Subsidiary ID"
-    },
-    "currency": {
-      "type": ["null", "integer"],
-      "description": "Currency ID"
-    },
-    "externalid": {
-      "type": ["null", "string"],
-      "description": "External ID"
     }
   }
 }

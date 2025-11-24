@@ -12,42 +12,6 @@
     "companyname": {
       "type": ["null", "string"],
       "description": "Full name (firstname + lastname)"
-    },
-    "firstname": {
-      "type": ["null", "string"],
-      "description": "First name"
-    },
-    "lastname": {
-      "type": ["null", "string"],
-      "description": "Last name"
-    },
-    "email": {
-      "type": ["null", "string"],
-      "description": "Email address"
-    },
-    "phone": {
-      "type": ["null", "string"],
-      "description": "Phone number"
-    },
-    "title": {
-      "type": ["null", "string"],
-      "description": "Job title"
-    },
-    "isinactive": {
-      "type": ["null", "string"],
-      "description": "Is inactive flag"
-    },
-    "lastmodifieddate": {
-      "type": ["null", "string"],
-      "description": "Last modified date"
-    },
-    "subsidiary": {
-      "type": ["null", "integer"],
-      "description": "Subsidiary ID"
-    },
-    "externalid": {
-      "type": ["null", "string"],
-      "description": "External ID"
     }
   }
 }
