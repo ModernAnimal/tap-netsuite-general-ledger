@@ -37,7 +37,7 @@ pip install tap-netsuite-general-ledger
 
 | Setting | Type | Description |
 |---------|------|-------------|
-| `netsuite_account` | string | Your NetSuite account ID (e.g., "5665960") |
+| `netsuite_account` | string | Your NetSuite account ID |
 | `netsuite_consumer_key` | string | OAuth consumer key from Integration record |
 | `netsuite_consumer_secret` | string | OAuth consumer secret from Integration record |
 | `netsuite_token_id` | string | OAuth token ID from Access Token |
@@ -57,7 +57,7 @@ pip install tap-netsuite-general-ledger
 **Full Refresh (all posted transactions):**
 ```json
 {
-  "netsuite_account": "5665960",
+  "netsuite_account": "your_account_id",
   "netsuite_consumer_key": "your_consumer_key",
   "netsuite_consumer_secret": "your_consumer_secret",
   "netsuite_token_id": "your_token_id",
@@ -71,7 +71,7 @@ pip install tap-netsuite-general-ledger
 **Incremental Sync (modified records only):**
 ```json
 {
-  "netsuite_account": "5665960",
+  "netsuite_account": "your_account_id",
   "netsuite_consumer_key": "your_consumer_key",
   "netsuite_consumer_secret": "your_consumer_secret",
   "netsuite_token_id": "your_token_id",
