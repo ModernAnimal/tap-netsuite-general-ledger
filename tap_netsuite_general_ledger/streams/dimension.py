@@ -65,14 +65,35 @@ DIMENSION_TABLE_CONFIGS = {
     },
     'netsuite_location': {
         'query': """
-            SELECT id, cseg1, custrecord1 as taxrate,
-                   custrecord2 as openingdate, custrecord3 as closingdate,
-                   custrecord4 as lease_refid, fullname, isinactive,
-                   custrecord_bdc_lastupdatedbyimp_loc, lastmodifieddate,
-                   mainaddress, makeinventoryavailable, name, subsidiary,
-                   locationtype, externalid
-            FROM Location
-            ORDER BY Location.id
+            SELECT
+                l.id,
+                l.cseg1,
+                l.custrecord1 as TaxRate,
+                l.custrecord2 as OpeningDate,
+                l.custrecord3 as ClosingDate,
+                l.custrecord4 as Lease_RefID,
+                l.fullname,
+                l.isinactive,
+                l.custrecord_bdc_lastupdatedbyimp_loc,
+                l.lastmodifieddate,
+                l.mainaddress,
+                l.makeinventoryavailable,
+                l.name,
+                l.subsidiary,
+                l.locationtype,
+                l.externalid,
+                l.usebins,
+                a.addr1,
+                a.addr2,
+                a.city,
+                a.state,
+                a.zip,
+                a.country,
+                a.addrphone,
+                a.attention
+            FROM Location l
+            LEFT JOIN LocationMainAddress a ON l.mainaddress = a.nkey
+            ORDER BY l.id
         """,
         'key_properties': ['id']
     },

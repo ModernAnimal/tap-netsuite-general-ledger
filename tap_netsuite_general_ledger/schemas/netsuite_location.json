@@ -64,6 +64,42 @@
     "externalid": {
       "type": ["null", "string"],
       "description": "External ID"
+    },
+    "usebins": {
+      "type": ["null", "string"],
+      "description": "Use bins flag"
+    },
+    "addr1": {
+      "type": ["null", "string"],
+      "description": "Address line 1"
+    },
+    "addr2": {
+      "type": ["null", "string"],
+      "description": "Address line 2"
+    },
+    "city": {
+      "type": ["null", "string"],
+      "description": "City"
+    },
+    "state": {
+      "type": ["null", "string"],
+      "description": "State/Province"
+    },
+    "zip": {
+      "type": ["null", "string"],
+      "description": "Zip/Postal code"
+    },
+    "country": {
+      "type": ["null", "string"],
+      "description": "Country"
+    },
+    "addrphone": {
+      "type": ["null", "string"],
+      "description": "Address phone number"
+    },
+    "attention": {
+      "type": ["null", "string"],
+      "description": "Attention/Contact name"
     }
   }
 }

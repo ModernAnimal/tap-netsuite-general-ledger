@@ -47,179 +47,33 @@ STREAM_CONFIGS = {
 
 def load_schemas() -> Dict[str, Dict[str, Any]]:
     """Load all schema files from the schemas directory
-    
+
     Returns:
         Dictionary mapping stream_id to schema dict
     """
     schemas = {}
     schema_dir = os.path.join(os.path.dirname(__file__), "schemas")
-    
+
     # Load all JSON files in the schemas directory
     for filename in os.listdir(schema_dir):
         if filename.endswith('.json'):
             stream_id = filename.replace('.json', '')
             schema_path = os.path.join(schema_dir, filename)
-            
+
             with open(schema_path, 'r') as f:
                 schemas[stream_id] = json.load(f)
-    
+
     return schemas
-
-
-# Legacy functions kept for reference (no longer used)
-def get_gl_detail_schema() -> Dict[str, Any]:
-    """Get the schema for GL detail records from SuiteQL
-
-    Schema matches the data types output by sync.py transform_record function:
-    - Integer fields: internal_id, posting_period_id, trans_acct_line_id,
-                      acct_id, account_group, department, class, location
-    - Number fields: debit, credit, net_amount
-    - String fields: all others (including dates as returned by NetSuite API)
-    """
-    return {
-        "type": "object",
-        "properties": {
-            "posting_period": {
-                "type": ["null", "string"],
-                "description": "Posting period name (display format)"
-            },
-            "posting_period_id": {
-                "type": ["null", "integer"],
-                "description": "Posting period internal ID"
-            },
-            "created_date": {
-                "type": ["null", "string"],
-                "description": "Date created (as returned by NetSuite API)"
-            },
-            "trans_acct_line_last_modified": {
-                "type": ["null", "string"],
-                "description": (
-                    "Transaction accounting line last modified date "
-                    "(as returned by NetSuite API)"
-                )
-            },
-            "transaction_last_modified": {
-                "type": ["null", "string"],
-                "description": (
-                    "Transaction last modified date "
-                    "(as returned by NetSuite API)"
-                )
-            },
-            "account_last_modified": {
-                "type": ["null", "string"],
-                "description": (
-                    "Account last modified date "
-                    "(as returned by NetSuite API)"
-                )
-            },
-            "posting": {
-                "type": ["null", "string"],
-                "description": "Posting flag (T/F)"
-            },
-            "approval": {
-                "type": ["null", "string"],
-                "description": "Approval status"
-            },
-            "transaction_date": {
-                "type": ["null", "string"],
-                "description": "Transaction date (as returned by NetSuite API)"
-            },
-            "transaction_id": {
-                "type": ["null", "string"],
-                "description": "Transaction ID (e.g., DEP10020469)"
-            },
-            "trans_acct_line_id": {
-                "type": "integer",
-                "description": "Transaction accounting line ID"
-            },
-            "internal_id": {
-                "type": "integer",
-                "description": "Internal ID of the transaction"
-            },
-            "entity_name": {
-                "type": ["null", "string"],
-                "description": "Entity name"
-            },
-            "trans_memo": {
-                "type": ["null", "string"],
-                "description": "Transaction memo"
-            },
-            "trans_line_memo": {
-                "type": ["null", "string"],
-                "description": "Transaction line memo"
-            },
-            "transaction_type": {
-                "type": ["null", "string"],
-                "description": (
-                    "Transaction type "
-                    "(e.g., Deposit, Journal, Bill Payment)"
-                )
-            },
-            "acct_id": {
-                "type": ["null", "integer"],
-                "description": "Account ID"
-            },
-            "account_group": {
-                "type": ["null", "integer"],
-                "description": "Account group (parent account ID)"
-            },
-            "department": {
-                "type": ["null", "integer"],
-                "description": "Department ID"
-            },
-            "class": {
-                "type": ["null", "integer"],
-                "description": "Class ID"
-            },
-            "location": {
-                "type": ["null", "integer"],
-                "description": "Location ID"
-            },
-            "debit": {
-                "type": ["null", "number"],
-                "description": "Debit amount"
-            },
-            "credit": {
-                "type": ["null", "number"],
-                "description": "Credit amount"
-            },
-            "net_amount": {
-                "type": ["null", "number"],
-                "description": "Net amount (debit - credit)"
-            },
-            "subsidiary": {
-                "type": ["null", "string"],
-                "description": "Subsidiary name"
-            },
-            "document_number": {
-                "type": ["null", "string"],
-                "description": "Document number"
-            },
-            "status": {
-                "type": ["null", "string"],
-                "description": "Transaction status"
-            }
-        }
-    }
-
-
-def get_gl_detail_metadata() -> Dict[str, Any]:
-    """Get metadata for GL detail stream"""
-    return {
-        "selected": True,
-        "replication-method": "FULL_TABLE",
-        "forced-replication-method": "FULL_TABLE"
-    }
 
 
 def discover_streams(config: Dict[str, Any]) -> Catalog:
     """Discover available streams by loading schemas from JSON files"""
-    
+
     # Load all schemas from JSON files
     raw_schemas = load_schemas()
-    
+
     streams = []
-    
+
     for stream_id, schema_dict in raw_schemas.items():
         # Get stream configuration
         stream_config = STREAM_CONFIGS.get(stream_id, {})
@@ -227,17 +81,17 @@ def discover_streams(config: Dict[str, Any]) -> Catalog:
         replication_method = stream_config.get(
             'replication_method', 'FULL_TABLE'
         )
-        
+
         # Create schema object
         schema = Schema.from_dict(schema_dict)
-        
+
         # Create metadata
         metadata = {
             'selected': True,
             'replication-method': replication_method,
             'forced-replication-method': replication_method
         }
-        
+
         # Create catalog entry
         entry = CatalogEntry(
             tap_stream_id=stream_id,
@@ -246,26 +100,7 @@ def discover_streams(config: Dict[str, Any]) -> Catalog:
             key_properties=key_properties,
             metadata=metadata
         )
-        
+
         streams.append(entry)
-    
+
     return Catalog(streams)
-
-
-def save_schema_to_file() -> None:
-    """Save schema to JSON file for reference"""
-    schema = get_gl_detail_schema()
-    schema_dir = os.path.join(os.path.dirname(__file__), "schemas")
-    os.makedirs(schema_dir, exist_ok=True)
-
-    schema_file = os.path.join(
-        schema_dir, "netsuite_general_ledger_detail.json"
-    )
-    with open(schema_file, 'w') as f:
-        json.dump(schema, f, indent=2)
-
-    print(f"Schema saved to {schema_file}")
-
-
-if __name__ == "__main__":
-    save_schema_to_file()

@@ -18,64 +18,6 @@ import singer
 
 LOGGER = singer.get_logger()
 
-# Dimension table query configurations
-DIMENSION_TABLE_QUERIES = {
-    'netsuite_account': """
-        SELECT *
-        FROM Account
-        ORDER BY Account.id
-    """,
-    'netsuite_vendor': """
-        SELECT vc.name as category, v.id, v.accountnumber, v.altname,
-               v.balance, v.balanceprimary, v.comments, v.companyname,
-               v.creditlimit, v.currency, v.custentity_2663_payment_method,
-               v.datecreated, v.email, v.emailpreference, v.emailtransactions,
-               v.entityid, v.expenseaccount, v.externalid, v.fax,
-               v.faxtransactions, v.giveaccess, v.incoterm, v.is1099eligible,
-               v.isinactive, v.isjobresourcevend, v.isperson, v.laborcost,
-               v.lastmodifieddate, v.legalname, v.payablesaccount, v.phone,
-               v.printoncheckas, v.printtransactions, v.purchaseorderamount,
-               v.purchaseorderquantity, v.purchaseorderquantitydiff,
-               v.receiptamount, v.receiptquantity, v.receiptquantitydiff,
-               v.representingsubsidiary, v.subsidiary, v.terms,
-               v.unbilledorders, v.unbilledordersprimary, v.url,
-               v.workcalendar
-        FROM Vendor v
-        LEFT JOIN VendorCategory vc on v.category = vc.id
-        ORDER BY v.id
-    """,
-    'netsuite_classification': """
-        SELECT *
-        FROM classification
-        ORDER BY classification.id
-    """,
-    'netsuite_department': """
-        SELECT *
-        FROM Department
-        ORDER BY Department.id
-    """,
-    'netsuite_location': """
-        SELECT id, cseg1, custrecord1 as taxrate,
-               custrecord2 as openingdate, custrecord3 as closingdate,
-               custrecord4 as lease_refid, fullname, isinactive,
-               custrecord_bdc_lastupdatedbyimp_loc, lastmodifieddate,
-               mainaddress, makeinventoryavailable, name, subsidiary,
-               locationtype, externalid
-        FROM Location
-        ORDER BY Location.id
-    """,
-    'netsuite_customer': """
-        SELECT id, entityid, companyname
-        FROM customer
-        ORDER BY id
-    """,
-    'netsuite_employee': """
-        SELECT id, entityid, firstname || ' ' || lastname as companyname
-        FROM employee
-        ORDER BY id
-    """
-}
-
 
 class NetSuiteClient:
     """NetSuite API client with OAuth 1.0a authentication for SuiteQL"""

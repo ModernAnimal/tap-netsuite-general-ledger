@@ -170,11 +170,7 @@ class GLDetailStream(BaseStream):
                 self.client.last_modified_date
             )
 
-        try:
-            singer.write_state(state)
-        except BrokenPipeError:
-            LOGGER.warning("Broken pipe when writing initial state")
-            return state
+        self.write_state(state)
 
         # Create event loop for async operations
         loop = asyncio.new_event_loop()
@@ -242,27 +238,20 @@ class GLDetailStream(BaseStream):
                     )
 
                     # Write state after each page for checkpointing
-                    try:
-                        state['bookmarks'][self.tap_stream_id] = {
-                            'last_sync': datetime.now(
-                                timezone.utc
-                            ).isoformat(),
-                            'record_count': total_processed,
-                            'replication_method': replication_method,
-                            'current_page': page_num
-                        }
-                        if self.client.last_modified_date:
-                            state['bookmarks'][self.tap_stream_id][
-                                'last_modified_date'
-                            ] = self.client.last_modified_date
+                    state['bookmarks'][self.tap_stream_id] = {
+                        'last_sync': datetime.now(
+                            timezone.utc
+                        ).isoformat(),
+                        'record_count': total_processed,
+                        'replication_method': replication_method,
+                        'current_page': page_num
+                    }
+                    if self.client.last_modified_date:
+                        state['bookmarks'][self.tap_stream_id][
+                            'last_modified_date'
+                        ] = self.client.last_modified_date
 
-                        singer.write_state(state)
-                    except BrokenPipeError:
-                        LOGGER.warning(
-                            f"Broken pipe when writing state after page "
-                            f"{page_num}"
-                        )
-                        raise
+                    self.write_state(state)
 
             # Run the async page processor
             loop.run_until_complete(process_pages())
@@ -293,9 +282,6 @@ class GLDetailStream(BaseStream):
                 self.client.last_modified_date
             )
 
-        try:
-            singer.write_state(state)
-        except BrokenPipeError:
-            LOGGER.warning("Broken pipe when writing final state")
+        self.write_state(state)
 
         return state
