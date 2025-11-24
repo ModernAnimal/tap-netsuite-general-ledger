@@ -49,6 +49,7 @@ pip install tap-netsuite-general-ledger
 |---------|------|---------|-------------|
 | `last_modified_date` | string | `null` | Date for incremental sync (format: `YYYY-MM-DD`). Omit for full refresh. |
 | `page_size` | integer | `1000` | Records per API request (max: 1000 per NetSuite limits). State is written after each page. |
+| `concurrent_requests` | integer | `5` | Number of concurrent page requests to fetch in parallel. Increase for faster syncs (test with 5-10). |
 
 ### Sample Configuration
 
@@ -60,7 +61,8 @@ pip install tap-netsuite-general-ledger
   "netsuite_consumer_secret": "your_consumer_secret",
   "netsuite_token_id": "your_token_id",
   "netsuite_token_secret": "your_token_secret",
-  "page_size": 1000
+  "page_size": 1000,
+  "concurrent_requests": 5
 }
 ```
 
@@ -73,7 +75,8 @@ pip install tap-netsuite-general-ledger
   "netsuite_token_id": "your_token_id",
   "netsuite_token_secret": "your_token_secret",
   "last_modified_date": "2025-11-17",
-  "page_size": 1000
+  "page_size": 1000,
+  "concurrent_requests": 5
 }
 ```
 
@@ -204,6 +207,23 @@ Results are ordered by `t.ID, t.TranDate, t.TranID, tal.TransactionLine` for con
 
 ## Performance & Pagination
 
+### Concurrent Page Fetching
+
+The tap uses **concurrent page fetching** to dramatically improve performance when extracting large datasets:
+
+1. **Parallel Requests:** Multiple pages are fetched simultaneously (default: 5 concurrent requests)
+2. **Ordered Results:** Pages are buffered and yielded in order to maintain Singer protocol compliance
+3. **Connection Pooling:** A persistent HTTP session is reused across all requests
+4. **Rate Limiting:** Semaphore controls ensure NetSuite isn't overwhelmed
+
+**Performance Impact:** With `concurrent_requests=5`, a 1.3 million record extraction that previously took several hours can complete in 30-60 minutes.
+
+**Tuning Concurrency:**
+- Start with default of `5` concurrent requests
+- Monitor NetSuite for rate limiting errors
+- Gradually increase to `10` or `15` for faster syncs if no errors occur
+- Reduce to `1` to disable concurrency (sequential mode) if issues arise
+
 ### Memory Optimization
 The tap uses streaming architecture to handle large datasets efficiently:
 
@@ -221,11 +241,11 @@ NetSuite SuiteQL has a **maximum offset of 99,000** records. The tap automatical
 
 ### Recommended Settings
 
-| Dataset Size | page_size | Notes |
-|--------------|-----------|-------|
-| < 100k records | 1000 | Recommended for most use cases |
-| 100k - 1M records | 1000 | ID-chunking automatically engaged |
-| > 1M records | 1000 | ID-chunking handles large datasets |
+| Dataset Size | page_size | concurrent_requests | Notes |
+|--------------|-----------|---------------------|-------|
+| < 100k records | 1000 | 5 | Good balance for small datasets |
+| 100k - 1M records | 1000 | 5-10 | ID-chunking automatically engaged |
+| > 1M records | 1000 | 10-15 | Higher concurrency for faster syncs |
 
 **Note:** State is written after each page to ensure reliable checkpointing and recovery.
 
@@ -324,6 +344,16 @@ If authentication fails, you'll see OAuth signature errors or 401 responses.
 - Check target logs for schema mismatches, constraint violations, or OOM errors
 - Try reducing `page_size` to 500 or lower
 - Verify catalog schema matches target table schema
+
+**Rate Limiting / 429 Errors**
+- Reduce `concurrent_requests` from default 5 to 3 or 1
+- NetSuite may throttle requests during peak hours
+- Contact NetSuite support to check your account's concurrency limits
+
+**Slow Performance**
+- Increase `concurrent_requests` from 5 to 10 or 15 for faster syncs
+- Monitor for rate limiting when increasing concurrency
+- Ensure adequate network bandwidth for concurrent connections
 
 ### Debug Logging
 
