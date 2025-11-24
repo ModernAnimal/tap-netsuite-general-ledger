@@ -1,0 +1,105 @@
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": ["null", "integer"],
+      "description": "Location ID"
+    },
+    "cseg1": {
+      "type": ["null", "integer"],
+      "description": "Custom segment 1"
+    },
+    "taxrate": {
+      "type": ["null", "number"],
+      "description": "Tax rate"
+    },
+    "openingdate": {
+      "type": ["null", "string"],
+      "description": "Opening date"
+    },
+    "closingdate": {
+      "type": ["null", "string"],
+      "description": "Closing date"
+    },
+    "lease_refid": {
+      "type": ["null", "string"],
+      "description": "Lease reference ID"
+    },
+    "fullname": {
+      "type": ["null", "string"],
+      "description": "Full name"
+    },
+    "isinactive": {
+      "type": ["null", "string"],
+      "description": "Is inactive flag"
+    },
+    "custrecord_bdc_lastupdatedbyimp_loc": {
+      "type": ["null", "string"],
+      "description": "Last updated by import custom field"
+    },
+    "lastmodifieddate": {
+      "type": ["null", "string"],
+      "description": "Last modified date"
+    },
+    "mainaddress": {
+      "type": ["null", "integer"],
+      "description": "Main address ID"
+    },
+    "makeinventoryavailable": {
+      "type": ["null", "string"],
+      "description": "Make inventory available flag"
+    },
+    "name": {
+      "type": ["null", "string"],
+      "description": "Name"
+    },
+    "subsidiary": {
+      "type": ["null", "integer"],
+      "description": "Subsidiary ID"
+    },
+    "locationtype": {
+      "type": ["null", "integer"],
+      "description": "Location type ID"
+    },
+    "externalid": {
+      "type": ["null", "string"],
+      "description": "External ID"
+    },
+    "usebins": {
+      "type": ["null", "string"],
+      "description": "Use bins flag"
+    },
+    "addr1": {
+      "type": ["null", "string"],
+      "description": "Address line 1"
+    },
+    "addr2": {
+      "type": ["null", "string"],
+      "description": "Address line 2"
+    },
+    "city": {
+      "type": ["null", "string"],
+      "description": "City"
+    },
+    "state": {
+      "type": ["null", "string"],
+      "description": "State/Province"
+    },
+    "zip": {
+      "type": ["null", "string"],
+      "description": "Zip/Postal code"
+    },
+    "country": {
+      "type": ["null", "string"],
+      "description": "Country"
+    },
+    "addrphone": {
+      "type": ["null", "string"],
+      "description": "Address phone number"
+    },
+    "attention": {
+      "type": ["null", "string"],
+      "description": "Attention/Contact name"
+    }
+  }
+}

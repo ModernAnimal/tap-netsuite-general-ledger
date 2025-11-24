@@ -8,163 +8,99 @@ from typing import Dict, Any
 
 from singer import Schema, CatalogEntry, Catalog
 
-
-def get_gl_detail_schema() -> Dict[str, Any]:
-    """Get the schema for GL detail records"""
-    return {
-        "type": "object",
-        "properties": {
-            "internal_id": {
-                "type": ["null", "string"],
-                "description": "Internal ID of the transaction"
-            },
-            "document_number": {
-                "type": ["null", "string"],
-                "description": "Document number"
-            },
-            "type": {
-                "type": ["null", "string"],
-                "description": "Transaction type"
-            },
-            "journal_name": {
-                "type": ["null", "string"],
-                "description": "Journal name"
-            },
-            "date": {
-                "type": ["null", "string"],
-                "format": "date-time",
-                "description": "Transaction date"
-            },
-            "period": {
-                "type": ["null", "string"],
-                "description": "Posting period"
-            },
-            "subsidiary": {
-                "type": ["null", "string"],
-                "description": "Subsidiary"
-            },
-            "account": {
-                "type": ["null", "string"],
-                "description": "Account"
-            },
-            "amount_debit": {
-                "type": ["null", "number"],
-                "description": "Debit amount"
-            },
-            "amount_credit": {
-                "type": ["null", "number"],
-                "description": "Credit amount"
-            },
-            "amount_net": {
-                "type": ["null", "number"],
-                "description": "Net amount"
-            },
-            "amount_transaction_total": {
-                "type": ["null", "number"],
-                "description": "Transaction total amount"
-            },
-            "class": {
-                "type": ["null", "string"],
-                "description": "Class"
-            },
-            "location": {
-                "type": ["null", "string"],
-                "description": "Location"
-            },
-            "department": {
-                "type": ["null", "string"],
-                "description": "Department"
-            },
-            "name_line": {
-                "type": ["null", "string"],
-                "description": "Line name"
-            },
-            "memo_main": {
-                "type": ["null", "string"],
-                "description": "Main memo"
-            },
-            "memo_line": {
-                "type": ["null", "string"],
-                "description": "Line memo"
-            },
-            "status": {
-                "type": ["null", "string"],
-                "description": "Status"
-            },
-            "approval_status": {
-                "type": ["null", "string"],
-                "description": "Approval status"
-            },
-            "date_created": {
-                "type": ["null", "string"],
-                "format": "date-time",
-                "description": "Date created"
-            },
-            "created_by": {
-                "type": ["null", "string"],
-                "description": "Created by"
-            },
-            "name": {
-                "type": ["null", "string"],
-                "description": "Name"
-            },
-            "posting": {
-                "type": ["null", "string"],
-                "description": "Posting"
-            },
-            "company_name": {
-                "type": ["null", "string"],
-                "description": "Company name"
-            },
-            "transaction_line_id": {
-                "type": ["null", "string"],
-                "description": "Transaction line ID"
-            }
-        }
+# Stream configuration: maps stream_id to its key properties
+STREAM_CONFIGS = {
+    'netsuite_general_ledger_detail': {
+        'key_properties': ['internal_id', 'trans_acct_line_id'],
+        'replication_method': 'FULL_TABLE'
+    },
+    'netsuite_account': {
+        'key_properties': ['id'],
+        'replication_method': 'FULL_TABLE'
+    },
+    'netsuite_vendor': {
+        'key_properties': ['id'],
+        'replication_method': 'FULL_TABLE'
+    },
+    'netsuite_classification': {
+        'key_properties': ['id'],
+        'replication_method': 'FULL_TABLE'
+    },
+    'netsuite_department': {
+        'key_properties': ['id'],
+        'replication_method': 'FULL_TABLE'
+    },
+    'netsuite_location': {
+        'key_properties': ['id'],
+        'replication_method': 'FULL_TABLE'
+    },
+    'netsuite_customer': {
+        'key_properties': ['id'],
+        'replication_method': 'FULL_TABLE'
+    },
+    'netsuite_employee': {
+        'key_properties': ['id'],
+        'replication_method': 'FULL_TABLE'
     }
+}
 
 
-def get_gl_detail_metadata() -> Dict[str, Any]:
-    """Get metadata for GL detail stream"""
-    return {
-        "selected": True,
-        "replication-method": "FULL_TABLE",
-        "forced-replication-method": "FULL_TABLE"
-    }
+def load_schemas() -> Dict[str, Dict[str, Any]]:
+    """Load all schema files from the schemas directory
+
+    Returns:
+        Dictionary mapping stream_id to schema dict
+    """
+    schemas = {}
+    schema_dir = os.path.join(os.path.dirname(__file__), "schemas")
+
+    # Load all JSON files in the schemas directory
+    for filename in os.listdir(schema_dir):
+        if filename.endswith('.json'):
+            stream_id = filename.replace('.json', '')
+            schema_path = os.path.join(schema_dir, filename)
+
+            with open(schema_path, 'r') as f:
+                schemas[stream_id] = json.load(f)
+
+    return schemas
 
 
 def discover_streams(config: Dict[str, Any]) -> Catalog:
-    """Discover available streams"""
+    """Discover available streams by loading schemas from JSON files"""
 
-    # Create the GL detail stream
-    gl_detail_schema = Schema.from_dict(get_gl_detail_schema())
-    gl_detail_metadata = get_gl_detail_metadata()
+    # Load all schemas from JSON files
+    raw_schemas = load_schemas()
 
-    gl_detail_entry = CatalogEntry(
-        tap_stream_id="netsuite_general_ledger_detail",
-        stream="netsuite_general_ledger_detail",
-        schema=gl_detail_schema,
-        key_properties=["internal_id", "transaction_line_id"],
-        metadata=gl_detail_metadata
-    )
+    streams = []
 
-    return Catalog([gl_detail_entry])
+    for stream_id, schema_dict in raw_schemas.items():
+        # Get stream configuration
+        stream_config = STREAM_CONFIGS.get(stream_id, {})
+        key_properties = stream_config.get('key_properties', ['id'])
+        replication_method = stream_config.get(
+            'replication_method', 'FULL_TABLE'
+        )
 
+        # Create schema object
+        schema = Schema.from_dict(schema_dict)
 
-def save_schema_to_file() -> None:
-    """Save schema to JSON file for reference"""
-    schema = get_gl_detail_schema()
-    schema_dir = os.path.join(os.path.dirname(__file__), "schemas")
-    os.makedirs(schema_dir, exist_ok=True)
+        # Create metadata
+        metadata = {
+            'selected': True,
+            'replication-method': replication_method,
+            'forced-replication-method': replication_method
+        }
 
-    schema_file = os.path.join(
-        schema_dir, "netsuite_general_ledger_detail.json"
-    )
-    with open(schema_file, 'w') as f:
-        json.dump(schema, f, indent=2)
+        # Create catalog entry
+        entry = CatalogEntry(
+            tap_stream_id=stream_id,
+            stream=stream_id,
+            schema=schema,
+            key_properties=key_properties,
+            metadata=metadata
+        )
 
-    print(f"Schema saved to {schema_file}")
+        streams.append(entry)
 
-
-if __name__ == "__main__":
-    save_schema_to_file()
+    return Catalog(streams)
