@@ -1,0 +1,17 @@
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": ["null", "integer"],
+      "description": "Employee ID"
+    },
+    "entityid": {
+      "type": ["null", "string"],
+      "description": "Entity ID"
+    },
+    "companyname": {
+      "type": ["null", "string"],
+      "description": "Full name (firstname + lastname)"
+    }
+  }
+}

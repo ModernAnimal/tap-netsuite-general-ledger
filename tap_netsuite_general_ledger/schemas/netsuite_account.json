@@ -1,0 +1,113 @@
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": ["null", "integer"],
+      "description": "Account ID"
+    },
+    "acctname": {
+      "type": ["null", "string"],
+      "description": "Account name"
+    },
+    "acctnumber": {
+      "type": ["null", "string"],
+      "description": "Account number"
+    },
+    "accttype": {
+      "type": ["null", "string"],
+      "description": "Account type"
+    },
+    "balance": {
+      "type": ["null", "number"],
+      "description": "Account balance"
+    },
+    "cashflowrate": {
+      "type": ["null", "string"],
+      "description": "Cash flow rate"
+    },
+    "category1099misc": {
+      "type": ["null", "string"],
+      "description": "1099 MISC category"
+    },
+    "currency": {
+      "type": ["null", "string"],
+      "description": "Currency"
+    },
+    "description": {
+      "type": ["null", "string"],
+      "description": "Account description"
+    },
+    "displaynamewithhierarchy": {
+      "type": ["null", "string"],
+      "description": "Display name with hierarchy"
+    },
+    "eliminate": {
+      "type": ["null", "string"],
+      "description": "Eliminate flag"
+    },
+    "exchangerate": {
+      "type": ["null", "string"],
+      "description": "Exchange rate"
+    },
+    "externalid": {
+      "type": ["null", "string"],
+      "description": "External ID"
+    },
+    "fullname": {
+      "type": ["null", "string"],
+      "description": "Full name"
+    },
+    "generalrate": {
+      "type": ["null", "string"],
+      "description": "General rate"
+    },
+    "includechildren": {
+      "type": ["null", "string"],
+      "description": "Include children flag"
+    },
+    "inventory": {
+      "type": ["null", "string"],
+      "description": "Inventory flag"
+    },
+    "isinactive": {
+      "type": ["null", "string"],
+      "description": "Is inactive flag"
+    },
+    "issummary": {
+      "type": ["null", "string"],
+      "description": "Is summary flag"
+    },
+    "lastmodifieddate": {
+      "type": ["null", "string"],
+      "description": "Last modified date"
+    },
+    "legalname": {
+      "type": ["null", "string"],
+      "description": "Legal name"
+    },
+    "localizations": {
+      "type": ["null", "string"],
+      "description": "Localizations"
+    },
+    "openbalance": {
+      "type": ["null", "string"],
+      "description": "Opening balance"
+    },
+    "parent": {
+      "type": ["null", "string"],
+      "description": "Parent account"
+    },
+    "reconcilewithmatching": {
+      "type": ["null", "string"],
+      "description": "Reconcile with matching"
+    },
+    "revalue": {
+      "type": ["null", "string"],
+      "description": "Revalue flag"
+    },
+    "subsidiary": {
+      "type": ["null", "string"],
+      "description": "Subsidiary"
+    }
+  }
+}

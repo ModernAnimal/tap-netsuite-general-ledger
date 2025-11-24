@@ -1,302 +1,78 @@
 """
-Sync functionality for NetSuite GL Detail tap
+Sync orchestration for NetSuite tap
+Routes streams to appropriate stream classes
 """
 
-import asyncio
-import json
-from datetime import datetime, timezone
 from typing import Dict, Any
 
 import singer
 from singer import CatalogEntry
 
-from .client import NetSuiteClient
+from .streams import DimensionStream, GLDetailStream
 
 LOGGER = singer.get_logger()
 
-
-def safe_int(value: Any) -> Any:
-    """Convert string to int, return None if empty/None"""
-    if value is None or value == '':
-        return None
-    try:
-        return int(value)
-    except (ValueError, TypeError):
-        return None
-
-
-def safe_float(value: Any) -> Any:
-    """Convert string to float, return None if empty/None"""
-    if value is None or value == '':
-        return None
-    try:
-        return float(value)
-    except (ValueError, TypeError):
-        return None
-
-
-def transform_record(
-    record: Dict[str, Any],
-    client: NetSuiteClient
-) -> Dict[str, Any]:
-    """Transform NetSuite SuiteQL record with lightweight type conversion
-    
-    Only converts numeric fields to int/float. Everything else stays as string.
-    This is much faster than the previous heavy transformation logic.
-    """
-    # Fields that should be integers
-    int_fields = {
-        'internal_id', 'acct_id', 'posting_period_id', 'trans_acct_line_id',
-        'account_group', 'department', 'class', 'location'
-    }
-
-    # Fields that should be floats
-    float_fields = {'debit', 'credit', 'net_amount'}
-
-    # All expected fields from the schema (to ensure they exist even if NULL)
-    all_expected_fields = {
-        'posting_period', 'posting_period_id', 'created_date',
-        'trans_acct_line_last_modified', 'transaction_last_modified',
-        'account_last_modified', 'posting', 'approval', 'transaction_date',
-        'transaction_id', 'trans_acct_line_id', 'internal_id', 'entity_name',
-        'trans_memo', 'trans_line_memo', 'transaction_type', 'acct_id',
-        'account_group', 'department', 'class', 'location', 'debit', 'credit',
-        'net_amount', 'subsidiary', 'document_number', 'status'
-    }
-
-    transformed = {}
-
-    # First, initialize all expected fields to None
-    for field in all_expected_fields:
-        transformed[field] = None
-
-    # Then process the actual record data
-    for field, value in record.items():
-        # Skip the 'links' field entirely (not needed)
-        if field == 'links':
-            continue
-
-        # Convert numeric fields
-        if field in int_fields:
-            transformed[field] = safe_int(value)
-        elif field in float_fields:
-            transformed[field] = safe_float(value)
-        else:
-            # Everything else stays as string (or None if empty)
-            transformed[field] = None if value == '' else value
-
-    # Validate required fields
-    if transformed.get('trans_acct_line_id') is None:
-        LOGGER.warning(
-            f"Skipping record with NULL/empty trans_acct_line_id: "
-            f"internal_id={transformed.get('internal_id')}"
-        )
-        return None
-
-    if transformed.get('internal_id') is None:
-        LOGGER.warning(
-            f"Skipping record with NULL/empty internal_id: "
-            f"trans_acct_line_id={transformed.get('trans_acct_line_id')}"
-        )
-        return None
-
-    return transformed
-
-
-def get_sync_params(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Extract sync parameters from config"""
-    params = {}
-
-    # Check for last_modified_date for incremental sync
-    if config.get('last_modified_date'):
-        params['last_modified_date'] = config['last_modified_date']
-
-    return params
+# List of dimension table stream IDs
+DIMENSION_STREAMS = {
+    'netsuite_account', 'netsuite_vendor', 'netsuite_classification',
+    'netsuite_department', 'netsuite_location', 'netsuite_customer',
+    'netsuite_employee'
+}
 
 
 def sync_stream(
-    client: NetSuiteClient,
+    client,
     stream: CatalogEntry,
     state: Dict[str, Any],
     config: Dict[str, Any]
 ) -> Dict[str, Any]:
-    """Sync a single stream with page-level streaming"""
+    """Sync a single stream by routing to appropriate stream class
 
-    stream_name = stream.tap_stream_id
+    Args:
+        client: NetSuiteClient instance
+        stream: CatalogEntry for the stream
+        state: Current state dict
+        config: Configuration dict
 
-    # Check if incremental sync is enabled
-    if client.last_modified_date:
-        LOGGER.info(
-            f"Starting incremental sync for stream: {stream_name} "
-            f"(last_modified >= {client.last_modified_date})"
-        )
-    else:
-        LOGGER.info(f"Starting full refresh sync for stream: {stream_name}")
+    Returns:
+        Updated state dict
+    """
+    stream_id = stream.tap_stream_id
 
-    # Write schema
-    singer.write_schema(
-        stream_name, stream.schema.to_dict(), stream.key_properties
-    )
-
-    # Initialize state
-    if state is None:
-        state = {}
-    if 'bookmarks' not in state:
-        state['bookmarks'] = {}
-
-    # Sync using page-level streaming
-    return _sync_stream_page_by_page(client, stream, state)
-
-
-def _sync_stream_page_by_page(
-    client: NetSuiteClient,
-    stream: CatalogEntry,
-    state: Dict[str, Any]
-) -> Dict[str, Any]:
-    """Sync a single stream by processing pages as they arrive"""
-
-    stream_name = stream.tap_stream_id
-    replication_method = (
-        'INCREMENTAL' if client.last_modified_date else 'FULL_TABLE'
-    )
-
-    # Initialize tracking
-    total_processed = 0
-    page_num = 0
-    start_time = datetime.now(timezone.utc)
-
-    # Write initial state
-    state['bookmarks'][stream_name] = {
-        'replication_method': replication_method,
-        'sync_started': start_time.isoformat(),
-    }
-    if client.last_modified_date:
-        state['bookmarks'][stream_name]['last_modified_date'] = (
-            client.last_modified_date
-        )
+    LOGGER.info(f"Syncing stream: {stream_id}")
 
     try:
-        singer.write_state(state)
-    except BrokenPipeError:
-        LOGGER.warning("Broken pipe when writing initial state")
+        # Route to appropriate stream class
+        if stream_id in DIMENSION_STREAMS:
+            # Use DimensionStream class for dimension tables
+            stream_instance = DimensionStream(client, config, stream_id)
+        elif stream_id in (
+            'netsuite_general_ledger_detail', 'netsuite_gl_detail'
+        ):
+            # Use GLDetailStream class for GL detail
+            # (supports both old and new names)
+            stream_instance = GLDetailStream(client, config)
+        else:
+            raise ValueError(f"Unknown stream: {stream_id}")
+
+        # Sync the stream
+        state = stream_instance.sync(stream, state)
+
+        # Write final state after stream completion
+        try:
+            singer.write_state(state)
+        except BrokenPipeError:
+            LOGGER.warning(
+                "Broken pipe detected when writing final state - "
+                "exiting gracefully"
+            )
+        except Exception as e:
+            LOGGER.error(f"Error writing final state: {str(e)}")
+
         return state
 
-    # Create event loop for async operations
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    try:
-        # Process each page as it arrives
-        async def process_pages():
-            nonlocal total_processed, page_num
-
-            async for page in client.fetch_gl_data_pages():
-                page_num += 1
-                page_start_count = total_processed
-
-                LOGGER.info(
-                    f"Processing page {page_num} ({len(page)} records)"
-                )
-
-                # Process each record in the page
-                for idx, record in enumerate(page):
-                    try:
-                        transformed = transform_record(record, client)
-
-                        # Skip records with missing required fields
-                        if transformed is None:
-                            continue
-
-                        try:
-                            singer.write_record(stream_name, transformed)
-                            total_processed += 1
-                        except BrokenPipeError:
-                            LOGGER.error(
-                                f"Broken pipe - target terminated after "
-                                f"{total_processed} records "
-                                f"(page {page_num}, record {idx + 1})"
-                            )
-                            LOGGER.error(
-                                f"Problem record - "
-                                f"internal_id: {record.get('internal_id')}, "
-                                f"trans_acct_line_id: {record.get('trans_acct_line_id')}, "
-                                f"{record.get('trans_acct_line_id')}, "
-                                f"transaction_id: {record.get('transaction_id')}"
-                            )
-                            # Log record data for debugging
-                            record_str = json.dumps(record)
-                            LOGGER.error(f"Record data: {record_str}")
-                            raise
-
-                    except BrokenPipeError:
-                        raise
-                    except Exception as e:
-                        LOGGER.warning(
-                            f"Error processing record {idx + 1} "
-                            f"in page {page_num}: {str(e)}"
-                        )
-                        continue
-
-                page_processed = total_processed - page_start_count
-                LOGGER.info(
-                    f"Completed page {page_num}: "
-                    f"{page_processed} records processed "
-                    f"(Total: {total_processed})"
-                )
-
-                # Write state after each page for checkpointing
-                try:
-                    state['bookmarks'][stream_name] = {
-                        'last_sync': datetime.now(timezone.utc).isoformat(),
-                        'record_count': total_processed,
-                        'replication_method': replication_method,
-                        'current_page': page_num
-                    }
-                    if client.last_modified_date:
-                        state['bookmarks'][stream_name][
-                            'last_modified_date'
-                        ] = client.last_modified_date
-
-                    singer.write_state(state)
-                except BrokenPipeError:
-                    LOGGER.warning(
-                        f"Broken pipe when writing state after page "
-                        f"{page_num}"
-                    )
-                    raise
-
-        # Run the async page processor
-        loop.run_until_complete(process_pages())
-
-    except BrokenPipeError:
-        LOGGER.warning("Broken pipe during sync - exiting gracefully")
-        return state
-    except Exception as e:
-        LOGGER.error(f"Error during sync: {str(e)}")
+    except Exception as stream_error:
+        LOGGER.error(
+            f"Error syncing stream {stream_id}: {str(stream_error)}"
+        )
         raise
-    finally:
-        loop.close()
-
-    LOGGER.info(
-        f"Completed sync: {total_processed} records processed "
-        f"across {page_num} pages"
-    )
-
-    # Final state update
-    state['bookmarks'][stream_name] = {
-        'last_sync': datetime.now(timezone.utc).isoformat(),
-        'record_count': total_processed,
-        'replication_method': replication_method,
-        'sync_completed': True
-    }
-    if client.last_modified_date:
-        state['bookmarks'][stream_name]['last_modified_date'] = (
-            client.last_modified_date
-        )
-
-    try:
-        singer.write_state(state)
-    except BrokenPipeError:
-        LOGGER.warning("Broken pipe when writing final state")
-
-    return state

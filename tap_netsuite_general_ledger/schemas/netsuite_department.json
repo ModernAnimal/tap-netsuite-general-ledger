@@ -1,0 +1,41 @@
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": ["null", "integer"],
+      "description": "Department ID"
+    },
+    "externalid": {
+      "type": ["null", "string"],
+      "description": "External ID"
+    },
+    "fullname": {
+      "type": ["null", "string"],
+      "description": "Full name"
+    },
+    "includechildren": {
+      "type": ["null", "string"],
+      "description": "Include children flag"
+    },
+    "isinactive": {
+      "type": ["null", "string"],
+      "description": "Is inactive flag"
+    },
+    "lastmodifieddate": {
+      "type": ["null", "string"],
+      "description": "Last modified date"
+    },
+    "name": {
+      "type": ["null", "string"],
+      "description": "Name"
+    },
+    "parent": {
+      "type": ["null", "integer"],
+      "description": "Parent department ID"
+    },
+    "subsidiary": {
+      "type": ["null", "string"],
+      "description": "Subsidiary"
+    }
+  }
+}

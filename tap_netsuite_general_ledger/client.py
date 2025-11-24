@@ -1,6 +1,15 @@
 """
 NetSuite Client for Singer Tap
 Handles authentication and API requests to NetSuite SuiteQL API
+
+This client is responsible for transport-level concerns only:
+- OAuth 1.0a HMAC-SHA256 authentication
+- HTTP request/response handling
+- Pagination and chunking logic
+- Error handling and retries
+
+The client does NOT define queries or business logic - that belongs
+in the stream classes.
 """
 
 import asyncio
@@ -35,19 +44,48 @@ class NetSuiteClient:
         # Optional configuration
         self.page_size = config.get("page_size", 1000)
         self.last_modified_date = config.get("last_modified_date")
+        self.concurrent_requests = config.get("concurrent_requests", 5)
+        self.record_batch_size = config.get("record_batch_size", 1000)
 
         # Build SuiteQL URL
         self.base_url = f"https://{self.account}.suitetalk.api.netsuite.com"
         self.suiteql_url = f"{self.base_url}/services/rest/query/v1/suiteql"
+        
+        # HTTP session for connection reuse
+        self.session = None
 
         LOGGER.info(
             f"Initialized NetSuite SuiteQL client for account: {self.account}"
+        )
+        LOGGER.info(
+            f"Concurrency: {self.concurrent_requests} concurrent requests"
         )
         if self.last_modified_date:
             LOGGER.info(
                 f"Incremental sync mode: "
                 f"last_modified_date = {self.last_modified_date}"
             )
+
+    async def _ensure_session(self):
+        """Ensure aiohttp session exists for connection reuse"""
+        if self.session is None:
+            connector = aiohttp.TCPConnector(
+                limit=self.concurrent_requests * 2,
+                limit_per_host=self.concurrent_requests
+            )
+            timeout = aiohttp.ClientTimeout(total=600)  # 10 minutes
+            self.session = aiohttp.ClientSession(
+                connector=connector,
+                timeout=timeout
+            )
+            LOGGER.info("Created persistent HTTP session for connection reuse")
+
+    async def _close_session(self):
+        """Close the aiohttp session"""
+        if self.session is not None:
+            await self.session.close()
+            self.session = None
+            LOGGER.info("Closed HTTP session")
 
     def generate_oauth_header(
         self,
@@ -118,104 +156,28 @@ class NetSuiteClient:
 
         return ', '.join(header_parts)
 
-    def build_gl_query(self, min_internal_id: int = 0) -> str:
-        """Build the SuiteQL query to fetch GL data
-
-        Args:
-            min_internal_id: Minimum internal ID to fetch (for chunking
-                beyond offset limit)
-
-        Returns:
-            SuiteQL query string
-        """
-        # Base query with all fields from original demo
-        # Note: TransactionAccountingLine (tal) has debit/credit/account
-        #       TransactionLine (tl) has department/class/location/memo
-        query = """
-        SELECT
-            t.ID AS internal_id,
-            t.Trandate AS transaction_date,
-            coalesce(t.TranID, 'NULL') AS transaction_id,
-            tal.TransactionLine AS trans_acct_line_id,
-            BUILTIN.DF(t.PostingPeriod) AS posting_period,
-            t.PostingPeriod AS posting_period_id,
-            t.createdDateTime AS created_date,
-            tal.lastmodifieddate AS trans_acct_line_last_modified,
-            t.lastmodifieddate AS transaction_last_modified,
-            a.lastmodifieddate AS account_last_modified,
-            t.Posting AS posting,
-            BUILTIN.DF(t.approvalStatus) AS approval,
-            BUILTIN.DF(t.Entity) AS entity_name,
-            t.memo AS trans_memo,
-            tl.memo AS trans_line_memo,
-            BUILTIN.DF(t.Type) AS transaction_type,
-            tal.Account AS acct_id,
-            a.parent AS account_group,
-            tl.Department AS department,
-            tl.Class AS class,
-            tl.Location AS location,
-            tal.Debit AS debit,
-            tal.Credit AS credit,
-            tal.Amount AS net_amount,
-            BUILTIN.DF(tl.Subsidiary) AS subsidiary,
-            t.Number AS document_number,
-            BUILTIN.DF(t.Status) AS status
-        FROM
-            Transaction t
-        INNER JOIN TransactionAccountingLine tal ON (
-            tal.Transaction = t.ID
-        )
-        INNER JOIN Account a ON (
-            a.ID = tal.Account
-        )
-        LEFT JOIN TransactionLine tl ON (
-            tl.transaction = t.ID
-            AND tl.id = tal.TransactionLine
-        )
-        WHERE
-            ( t.Posting = 'T' )
-            AND ( tal.Posting = 'T' )
-            AND (
-                ( tal.Debit IS NOT NULL )
-                OR ( tal.Credit IS NOT NULL )
-            )
-        """
-
-        # Add ID filter if chunking (to handle offset limit)
-        if min_internal_id > 0:
-            query += f" AND t.ID > {min_internal_id}"
-
-        # Add incremental filter if last_modified_date is set
-        if self.last_modified_date:
-            query += (
-                f"""
-                    AND (
-                        t.lastModifiedDate >=
-                        TO_DATE('{self.last_modified_date}', 'YYYY-MM-DD')
-                        OR tal.lastModifiedDate >=
-                        TO_DATE('{self.last_modified_date}', 'YYYY-MM-DD')
-                        OR a.lastModifiedDate >=
-                        TO_DATE('{self.last_modified_date}', 'YYYY-MM-DD')
-                    )
-                """
-            )
-
-        # Order by transaction ID and line ID for consistent pagination
-        query += "ORDER BY t.id, t.TranDate, t.TranID, tal.TransactionLine"
-
-        return query
-
-    async def fetch_gl_data_pages(self):
-        """Fetch GL data from NetSuite SuiteQL page by page
+    async def fetch_gl_data_pages(self, query_builder_fn):
+        """Fetch GL data from NetSuite SuiteQL with concurrent page fetching
 
         Yields pages of records as they are fetched. Handles NetSuite's
         offset limit of 99,000 by using ID-based chunking when necessary.
 
+        Uses concurrent fetching within each chunk to improve performance,
+        but maintains order for Singer protocol compliance.
+
+        Args:
+            query_builder_fn: Function that takes (min_internal_id,
+                last_modified_date) and returns a SuiteQL query string
+
         Yields:
             List[Dict[str, Any]]: A page of records (up to page_size)
         """
+        await self._ensure_session()
 
-        LOGGER.info("Starting SuiteQL data fetch")
+        LOGGER.info("Starting SuiteQL data fetch with concurrent requests")
+        LOGGER.info(
+            f"Concurrency level: {self.concurrent_requests} simultaneous pages"
+        )
         if self.last_modified_date:
             LOGGER.info(f"Using incremental sync: {self.last_modified_date}")
         else:
@@ -226,76 +188,178 @@ class NetSuiteClient:
         max_offset = 99000  # NetSuite's maximum offset limit
         total_fetched = 0
 
-        # Fetch data in chunks when needed (due to offset limit)
-        while True:
-            LOGGER.info(
-                f"Fetching chunk {chunk_num} "
-                f"(starting from internal ID > {last_internal_id})"
-            )
-
-            # Build query with ID filter if needed
-            query = self.build_gl_query(min_internal_id=last_internal_id)
-
-            offset = 0
-            page_num = 1
-            chunk_has_records = False
-
-            # Fetch pages within this chunk (up to offset limit)
-            while offset <= max_offset:
+        try:
+            # Fetch data in chunks when needed (due to offset limit)
+            while True:
                 LOGGER.info(
-                    f"Fetching page {page_num} "
-                    f"(offset: {offset}, limit: {self.page_size})..."
+                    f"Fetching chunk {chunk_num} "
+                    f"(starting from internal ID > {last_internal_id})"
                 )
 
-                records = await self._fetch_page(query, offset, self.page_size)
-
-                if not records:
-                    LOGGER.info("No more records in this chunk")
-                    break
-
-                chunk_has_records = True
-                total_fetched += len(records)
-                last_internal_id = int(records[-1].get('internal_id', 0))
-
-                LOGGER.info(
-                    f"Fetched {len(records)} records "
-                    f"(Total so far: {total_fetched})"
+                # Build query with ID filter if needed
+                query = query_builder_fn(
+                    last_internal_id,
+                    self.last_modified_date
                 )
 
-                # Yield this page immediately for processing
-                yield records
+                # Fetch pages concurrently within this chunk
+                async for page in self._fetch_chunk_concurrent(
+                    query,
+                    max_offset
+                ):
+                    if not page:
+                        continue
 
-                # Check if this was the last page of results
-                if len(records) < self.page_size:
-                    LOGGER.info("Reached last page of chunk")
-                    break
+                    total_fetched += len(page)
+                    last_internal_id = int(page[-1].get('internal_id', 0))
 
-                offset += self.page_size
-                page_num += 1
-
-                # Check if we're approaching the offset limit
-                if offset > max_offset:
                     LOGGER.info(
-                        f"Approaching offset limit ({offset} > {max_offset})"
+                        f"Fetched {len(page)} records "
+                        f"(Total so far: {total_fetched})"
                     )
+
+                    # Yield this page immediately for processing
+                    yield page
+
+                    # Check if this was the last page of results
+                    if len(page) < self.page_size:
+                        LOGGER.info("Reached last page of chunk")
+                        # Signal end of chunk
+                        chunk_complete = True
+                        break
+                else:
+                    # Loop completed without break (no incomplete page)
+                    chunk_complete = False
+
+                # If we got incomplete page, this was the final chunk
+                if chunk_complete:
                     break
 
-            # If no records in this chunk, we're done
-            if not chunk_has_records:
-                break
-
-            # If we hit offset limit and got full page, continue next chunk
-            if offset > max_offset and len(records) == self.page_size:
+                # Continue to next chunk
                 chunk_num += 1
                 LOGGER.info(
                     f"Continuing to next chunk "
                     f"(ID filter: internal_id > {last_internal_id})"
                 )
-            else:
-                # This was the final chunk
-                break
 
-        LOGGER.info(f"Total records fetched: {total_fetched}")
+            LOGGER.info(f"Total records fetched: {total_fetched}")
+
+        finally:
+            await self._close_session()
+
+    async def _fetch_chunk_concurrent(
+        self,
+        query: str,
+        max_offset: int
+    ):
+        """Fetch a chunk of pages concurrently with ordered results
+
+        This method fetches multiple pages in parallel but yields them
+        in order to maintain Singer protocol compliance.
+
+        Args:
+            query: SuiteQL query to execute
+            max_offset: Maximum offset allowed for this chunk
+
+        Yields:
+            List[Dict[str, Any]]: Pages in order
+        """
+        # Create semaphore to limit concurrent requests
+        semaphore = asyncio.Semaphore(self.concurrent_requests)
+
+        async def fetch_page_with_semaphore(offset: int, page_num: int):
+            """Fetch a single page with semaphore control"""
+            async with semaphore:
+                LOGGER.debug(
+                    f"Fetching page {page_num} "
+                    f"(offset: {offset}, limit: {self.page_size})"
+                )
+                try:
+                    records = await self._fetch_page(
+                        query,
+                        offset,
+                        self.page_size
+                    )
+                    return (offset, page_num, records)
+                except Exception as e:
+                    error_msg = str(e)
+                    # 404 or "no records" errors are expected at end of data
+                    if "404" in error_msg or "failed: 404" in error_msg:
+                        LOGGER.debug(
+                            f"Page {page_num} (offset {offset}) not found - "
+                            f"likely beyond end of data"
+                        )
+                        # Return empty result to indicate end
+                        return (offset, page_num, [])
+                    else:
+                        # Other errors should be logged and re-raised
+                        LOGGER.error(
+                            f"Error fetching page {page_num} "
+                            f"(offset {offset}): {error_msg}"
+                        )
+                        raise
+
+        # Calculate all offsets for pages in this chunk
+        offsets = []
+        offset = 0
+        page_num = 1
+        while offset <= max_offset:
+            offsets.append((offset, page_num))
+            offset += self.page_size
+            page_num += 1
+
+        # Fetch pages in batches to avoid overwhelming NetSuite
+        batch_size = self.concurrent_requests * 3
+
+        for batch_start in range(0, len(offsets), batch_size):
+            batch_offsets = offsets[batch_start:batch_start + batch_size]
+
+            LOGGER.info(
+                f"Fetching batch of {len(batch_offsets)} pages "
+                f"(pages {batch_offsets[0][1]}-{batch_offsets[-1][1]})"
+            )
+
+            # Create tasks for this batch
+            tasks = [
+                fetch_page_with_semaphore(offset, pnum)
+                for offset, pnum in batch_offsets
+            ]
+
+            # Gather results (will complete in parallel)
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Log any exceptions that occurred
+            exceptions = [r for r in results if isinstance(r, Exception)]
+            if exceptions:
+                LOGGER.debug(
+                    f"Encountered {len(exceptions)} errors in batch "
+                    f"(likely beyond end of data)"
+                )
+
+            # Sort successful results by offset to maintain order
+            sorted_results = sorted(
+                [r for r in results if not isinstance(r, Exception)],
+                key=lambda x: x[0]
+            )
+
+            # If no successful results, we're done
+            if not sorted_results:
+                LOGGER.info("No more records in this chunk")
+                return
+
+            # Yield pages in order
+            for offset, page_num, records in sorted_results:
+                if not records:
+                    # Empty page - we've reached the end
+                    LOGGER.info("No more records in this chunk")
+                    return
+
+                yield records
+
+                # If incomplete page, we're done with this chunk
+                if len(records) < self.page_size:
+                    LOGGER.info("Reached last page of chunk")
+                    return
 
     async def _fetch_page(
         self,
@@ -303,7 +367,11 @@ class NetSuiteClient:
         offset: int,
         limit: int
     ) -> List[Dict[str, Any]]:
-        """Fetch a single page of data from SuiteQL API"""
+        """Fetch a single page of data from SuiteQL API
+        
+        Uses the persistent session for connection reuse.
+        """
+        await self._ensure_session()
 
         # Query parameters for pagination
         query_params = {
@@ -327,33 +395,97 @@ class NetSuiteClient:
         # Prepare request payload
         payload = {"q": query}
 
-        # Make request with timeout
-        timeout = aiohttp.ClientTimeout(total=600)  # 10 minutes
-
         try:
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.post(
-                    url,
-                    headers=headers,
-                    json=payload
-                ) as response:
+            async with self.session.post(
+                url,
+                headers=headers,
+                json=payload
+            ) as response:
 
-                    if response.status == 200:
-                        data = await response.json()
-                        items = data.get('items', [])
-                        return items
-                    else:
-                        error_text = await response.text()
-                        LOGGER.error(
-                            f"SuiteQL API error: {response.status} - "
-                            f"{error_text}"
-                        )
-                        raise Exception(
-                            f"SuiteQL API request failed: {response.status}"
-                        )
+                if response.status == 200:
+                    data = await response.json()
+                    items = data.get('items', [])
+                    return items
+                elif response.status == 404:
+                    # 404 when offset is beyond available data
+                    LOGGER.debug(
+                        f"404 response for offset {offset} - "
+                        f"no more records available"
+                    )
+                    return []
+                else:
+                    error_text = await response.text()
+                    LOGGER.error(
+                        f"SuiteQL API error: {response.status} - "
+                        f"{error_text}"
+                    )
+                    raise Exception(
+                        f"SuiteQL API request failed: {response.status}"
+                    )
         except asyncio.TimeoutError:
             LOGGER.error("Request timeout")
             raise
         except Exception as e:
             LOGGER.error(f"Error fetching page: {str(e)}")
             raise
+
+    async def fetch_dimension_table(
+        self,
+        stream_name: str,
+        query: str
+    ) -> List[Dict[str, Any]]:
+        """Fetch all data for a dimension table
+
+        Simpler than GL detail - just paginate through all records.
+        No need for chunking since dimension tables are typically smaller.
+
+        Args:
+            stream_name: Name of the stream/table to fetch
+            query: SuiteQL query to execute
+
+        Returns:
+            List of all records for the table
+        """
+        await self._ensure_session()
+
+        LOGGER.info(f"Fetching dimension table: {stream_name}")
+
+        all_records = []
+        offset = 0
+        page_num = 1
+
+        try:
+            while True:
+                LOGGER.info(
+                    f"Fetching page {page_num} "
+                    f"(offset: {offset}, limit: {self.page_size})..."
+                )
+
+                records = await self._fetch_page(query, offset, self.page_size)
+
+                if not records:
+                    LOGGER.info("No more records to fetch")
+                    break
+
+                all_records.extend(records)
+                LOGGER.info(
+                    f"Fetched {len(records)} records "
+                    f"(Total so far: {len(all_records)})"
+                )
+
+                # Check if this was the last page
+                if len(records) < self.page_size:
+                    LOGGER.info("Last page reached")
+                    break
+
+                offset += self.page_size
+                page_num += 1
+
+            LOGGER.info(
+                f"Total records fetched for {stream_name}: "
+                f"{len(all_records)}"
+            )
+            return all_records
+
+        finally:
+            await self._close_session()

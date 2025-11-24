@@ -1,0 +1,189 @@
+{
+  "type": "object",
+  "properties": {
+    "category": {
+      "type": ["null", "string"],
+      "description": "Vendor category name"
+    },
+    "id": {
+      "type": ["null", "integer"],
+      "description": "Vendor ID"
+    },
+    "accountnumber": {
+      "type": ["null", "string"],
+      "description": "Account number"
+    },
+    "altname": {
+      "type": ["null", "string"],
+      "description": "Alternative name"
+    },
+    "balance": {
+      "type": ["null", "number"],
+      "description": "Balance"
+    },
+    "balanceprimary": {
+      "type": ["null", "number"],
+      "description": "Primary balance"
+    },
+    "comments": {
+      "type": ["null", "string"],
+      "description": "Comments"
+    },
+    "companyname": {
+      "type": ["null", "string"],
+      "description": "Company name"
+    },
+    "creditlimit": {
+      "type": ["null", "number"],
+      "description": "Credit limit"
+    },
+    "currency": {
+      "type": ["null", "integer"],
+      "description": "Currency ID"
+    },
+    "custentity_2663_payment_method": {
+      "type": ["null", "integer"],
+      "description": "Payment method custom field"
+    },
+    "datecreated": {
+      "type": ["null", "string"],
+      "description": "Date created"
+    },
+    "email": {
+      "type": ["null", "string"],
+      "description": "Email address"
+    },
+    "emailpreference": {
+      "type": ["null", "string"],
+      "description": "Email preference"
+    },
+    "emailtransactions": {
+      "type": ["null", "string"],
+      "description": "Email transactions flag"
+    },
+    "entityid": {
+      "type": ["null", "string"],
+      "description": "Entity ID"
+    },
+    "expenseaccount": {
+      "type": ["null", "integer"],
+      "description": "Expense account ID"
+    },
+    "externalid": {
+      "type": ["null", "string"],
+      "description": "External ID"
+    },
+    "fax": {
+      "type": ["null", "string"],
+      "description": "Fax number"
+    },
+    "faxtransactions": {
+      "type": ["null", "string"],
+      "description": "Fax transactions flag"
+    },
+    "giveaccess": {
+      "type": ["null", "string"],
+      "description": "Give access flag"
+    },
+    "incoterm": {
+      "type": ["null", "integer"],
+      "description": "Incoterm ID"
+    },
+    "is1099eligible": {
+      "type": ["null", "string"],
+      "description": "1099 eligible flag"
+    },
+    "isinactive": {
+      "type": ["null", "string"],
+      "description": "Is inactive flag"
+    },
+    "isjobresourcevend": {
+      "type": ["null", "string"],
+      "description": "Is job resource vendor flag"
+    },
+    "isperson": {
+      "type": ["null", "string"],
+      "description": "Is person flag"
+    },
+    "laborcost": {
+      "type": ["null", "number"],
+      "description": "Labor cost"
+    },
+    "lastmodifieddate": {
+      "type": ["null", "string"],
+      "description": "Last modified date"
+    },
+    "legalname": {
+      "type": ["null", "string"],
+      "description": "Legal name"
+    },
+    "payablesaccount": {
+      "type": ["null", "integer"],
+      "description": "Payables account ID"
+    },
+    "phone": {
+      "type": ["null", "string"],
+      "description": "Phone number"
+    },
+    "printoncheckas": {
+      "type": ["null", "string"],
+      "description": "Print on check as"
+    },
+    "printtransactions": {
+      "type": ["null", "string"],
+      "description": "Print transactions flag"
+    },
+    "purchaseorderamount": {
+      "type": ["null", "number"],
+      "description": "Purchase order amount"
+    },
+    "purchaseorderquantity": {
+      "type": ["null", "number"],
+      "description": "Purchase order quantity"
+    },
+    "purchaseorderquantitydiff": {
+      "type": ["null", "number"],
+      "description": "Purchase order quantity difference"
+    },
+    "receiptamount": {
+      "type": ["null", "number"],
+      "description": "Receipt amount"
+    },
+    "receiptquantity": {
+      "type": ["null", "number"],
+      "description": "Receipt quantity"
+    },
+    "receiptquantitydiff": {
+      "type": ["null", "number"],
+      "description": "Receipt quantity difference"
+    },
+    "representingsubsidiary": {
+      "type": ["null", "integer"],
+      "description": "Representing subsidiary ID"
+    },
+    "subsidiary": {
+      "type": ["null", "integer"],
+      "description": "Subsidiary ID"
+    },
+    "terms": {
+      "type": ["null", "integer"],
+      "description": "Terms ID"
+    },
+    "unbilledorders": {
+      "type": ["null", "number"],
+      "description": "Unbilled orders"
+    },
+    "unbilledordersprimary": {
+      "type": ["null", "number"],
+      "description": "Unbilled orders primary"
+    },
+    "url": {
+      "type": ["null", "string"],
+      "description": "URL"
+    },
+    "workcalendar": {
+      "type": ["null", "integer"],
+      "description": "Work calendar ID"
+    }
+  }
+}
