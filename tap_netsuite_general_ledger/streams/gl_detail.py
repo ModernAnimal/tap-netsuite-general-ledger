@@ -229,14 +229,14 @@ class GLDetailStream(BaseStream):
 
         # Get posting periods from config
         posting_periods = self.config.get('posting_periods', [])
-        
+
         # If empty or not provided, do a single sync without period filter
         if not posting_periods:
             LOGGER.info(
                 "No posting_periods configured - syncing all periods"
             )
             total_records = self._sync_page_by_page(state, None)
-            
+
             # Write final state
             state['bookmarks'][self.tap_stream_id] = {
                 'last_sync': datetime.now(timezone.utc).isoformat(),
@@ -252,7 +252,7 @@ class GLDetailStream(BaseStream):
                 state['bookmarks'][self.tap_stream_id][
                     'last_modified_date'
                 ] = self.client.last_modified_date
-            
+
             self.write_state(state)
             return state
 
@@ -293,6 +293,9 @@ class GLDetailStream(BaseStream):
             )
 
             # Sync this posting period
+            LOGGER.info(
+                f"Calling _sync_page_by_page with period_name: '{period_name}'"
+            )
             period_start_time = datetime.now(timezone.utc)
             period_records = self._sync_page_by_page(state, period_name)
             period_end_time = datetime.now(timezone.utc)
@@ -408,6 +411,11 @@ class GLDetailStream(BaseStream):
 
                 # Pass query builder to client with posting period
                 def query_builder(min_id, last_mod):
+                    LOGGER.info(
+                        f"query_builder called with min_id={min_id}, "
+                        f"last_mod={last_mod}, "
+                        f"posting_period_name='{posting_period_name}'"
+                    )
                     return self.build_query(
                         min_id, last_mod, posting_period_name
                     )
