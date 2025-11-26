@@ -48,6 +48,7 @@ pip install tap-netsuite-general-ledger
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `last_modified_date` | string | `null` | Date for incremental sync (format: `YYYY-MM-DD`). Omit for full refresh. |
+| `posting_periods` | array | `[]` | List of posting period names to sync (e.g., `["Jan 2025", "Feb 2025"]`). If empty or omitted, syncs all periods. |
 | `page_size` | integer | `1000` | Records per API request (max: 1000 per NetSuite limits). State is written after each page. |
 | `concurrent_requests` | integer | `5` | Number of concurrent page requests to fetch in parallel. Increase for faster syncs (test with 5-10). |
 | `record_batch_size` | integer | `1000` | Number of records to accumulate before writing to output. Larger batches reduce I/O overhead. |
@@ -77,6 +78,21 @@ pip install tap-netsuite-general-ledger
   "netsuite_token_id": "your_token_id",
   "netsuite_token_secret": "your_token_secret",
   "last_modified_date": "2025-11-17",
+  "page_size": 1000,
+  "concurrent_requests": 5,
+  "record_batch_size": 1000
+}
+```
+
+**Specific Posting Periods:**
+```json
+{
+  "netsuite_account": "your_account_id",
+  "netsuite_consumer_key": "your_consumer_key",
+  "netsuite_consumer_secret": "your_consumer_secret",
+  "netsuite_token_id": "your_token_id",
+  "netsuite_token_secret": "your_token_secret",
+  "posting_periods": ["Jan 2025", "Feb 2025", "Mar 2025"],
   "page_size": 1000,
   "concurrent_requests": 5,
   "record_batch_size": 1000
@@ -135,6 +151,94 @@ When `last_modified_date` is provided, the tap only fetches records where `t.las
 - Capturing recent changes only
 
 **Example:** Set `last_modified_date` to the date of your last successful sync to only fetch new/modified records.
+
+### Posting Period Filtering
+
+The `posting_periods` configuration allows you to sync **specific accounting periods** instead of all periods. This is useful for:
+
+- **Closed period syncs**: Extract only finalized months (e.g., `["Jan 2025", "Feb 2025"]`)
+- **Year-end processing**: Sync specific fiscal periods
+- **Selective backfills**: Re-sync particular months without affecting others
+- **Testing**: Extract sample data from a single period
+
+**How It Works:**
+
+1. **Specify periods by name**: Use the human-readable format displayed in NetSuite (e.g., "Jan 2025", "Feb 2025")
+2. **Sequential processing**: Each period is processed completely before moving to the next
+3. **State tracking**: Completed periods are saved in state for resumability
+4. **Per-period stats**: State includes record counts and timing for each period
+
+**Configuration Examples:**
+
+```json
+{
+  "posting_periods": ["Jan 2025", "Feb 2025", "Mar 2025"]
+}
+```
+
+**Behavior:**
+- **If specified**: Only transactions with matching posting periods are extracted
+- **If empty array `[]`**: All periods are extracted (no filter applied)
+- **If omitted**: All periods are extracted (no filter applied)
+
+**State Output:**
+
+When using `posting_periods`, the state includes detailed per-period tracking:
+
+```json
+{
+  "bookmarks": {
+    "netsuite_general_ledger_detail": {
+      "last_sync": "2025-11-26T10:30:00Z",
+      "total_record_count": 15000,
+      "completed_posting_periods": ["Jan 2025", "Feb 2025", "Mar 2025"],
+      "posting_period_stats": {
+        "Jan 2025": {
+          "record_count": 5000,
+          "sync_started": "2025-11-26T10:00:00Z",
+          "sync_completed": "2025-11-26T10:10:00Z",
+          "duration_seconds": 600
+        },
+        "Feb 2025": {
+          "record_count": 5500,
+          "sync_started": "2025-11-26T10:10:00Z",
+          "sync_completed": "2025-11-26T10:20:00Z",
+          "duration_seconds": 600
+        },
+        "Mar 2025": {
+          "record_count": 4500,
+          "sync_started": "2025-11-26T10:20:00Z",
+          "sync_completed": "2025-11-26T10:30:00Z",
+          "duration_seconds": 600
+        }
+      },
+      "sync_completed": true
+    }
+  }
+}
+```
+
+**Recovery from Failures:**
+
+If a sync is interrupted midway through processing multiple periods:
+1. Already-completed periods are **skipped** on the next run
+2. The sync resumes from the next uncompleted period
+3. Record counts from completed periods are preserved
+
+**Example:** If syncing `["Jan 2025", "Feb 2025", "Mar 2025"]` fails after completing Jan and Feb, rerunning with the same config will skip Jan and Feb and start with Mar 2025.
+
+**Combining with Incremental Sync:**
+
+You can use both `posting_periods` and `last_modified_date` together:
+
+```json
+{
+  "posting_periods": ["Jan 2025", "Feb 2025"],
+  "last_modified_date": "2025-02-15"
+}
+```
+
+This will sync **only** Jan 2025 and Feb 2025 periods, **but only** records modified on or after 2025-02-15.
 
 ## Stream Details
 

@@ -227,13 +227,13 @@ class GLDetailStream(BaseStream):
         if 'bookmarks' not in state:
             state['bookmarks'] = {}
 
-        # Get posting period names from config
-        posting_period_names = self.config.get('posting_period_names', [])
+        # Get posting periods from config
+        posting_periods = self.config.get('posting_periods', [])
         
         # If empty or not provided, do a single sync without period filter
-        if not posting_period_names:
+        if not posting_periods:
             LOGGER.info(
-                "No posting_period_names configured - syncing all periods"
+                "No posting_periods configured - syncing all periods"
             )
             total_records = self._sync_page_by_page(state, None)
             
@@ -258,8 +258,8 @@ class GLDetailStream(BaseStream):
 
         # Otherwise, loop through each posting period
         LOGGER.info(
-            f"Syncing {len(posting_period_names)} posting periods: "
-            f"{posting_period_names}"
+            f"Syncing {len(posting_periods)} posting periods: "
+            f"{posting_periods}"
         )
 
         # Get previously completed periods from state
@@ -273,7 +273,7 @@ class GLDetailStream(BaseStream):
         total_records_all_periods = 0
 
         # Process each posting period sequentially
-        for period_name in posting_period_names:
+        for period_name in posting_periods:
             # Skip if already completed
             if period_name in completed_periods:
                 LOGGER.info(
@@ -288,8 +288,8 @@ class GLDetailStream(BaseStream):
 
             LOGGER.info(
                 f"Syncing posting period '{period_name}' "
-                f"({posting_period_names.index(period_name) + 1}/"
-                f"{len(posting_period_names)})"
+                f"({posting_periods.index(period_name) + 1}/"
+                f"{len(posting_periods)})"
             )
 
             # Sync this posting period
