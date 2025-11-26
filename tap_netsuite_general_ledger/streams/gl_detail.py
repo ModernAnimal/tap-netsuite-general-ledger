@@ -124,7 +124,7 @@ class GLDetailStream(BaseStream):
 
         # Add ID filter if chunking (to handle offset limit)
         if min_internal_id > 0:
-            query += f" AND t.ID > {min_internal_id}"
+            query += f" AND t.ID >= {min_internal_id}"
 
         # Add incremental filter if last_modified_date is set
         if last_modified_date:

@@ -193,7 +193,7 @@ class NetSuiteClient:
             while True:
                 LOGGER.info(
                     f"Fetching chunk {chunk_num} "
-                    f"(starting from internal ID > {last_internal_id})"
+                    f"(starting from internal ID >= {last_internal_id})"
                 )
 
                 # Build query with ID filter if needed
@@ -246,7 +246,7 @@ class NetSuiteClient:
                 chunk_num += 1
                 LOGGER.info(
                     f"Continuing to next chunk "
-                    f"(ID filter: internal_id > {last_internal_id})"
+                    f"(ID filter: internal_id >= {last_internal_id})"
                 )
 
             LOGGER.info(f"Total records fetched: {total_fetched}")
