@@ -203,6 +203,7 @@ class NetSuiteClient:
                 )
 
                 # Fetch pages concurrently within this chunk
+                chunk_has_data = False
                 async for page in self._fetch_chunk_concurrent(
                     query,
                     max_offset
@@ -210,6 +211,7 @@ class NetSuiteClient:
                     if not page:
                         continue
 
+                    chunk_has_data = True
                     total_fetched += len(page)
                     last_internal_id = int(page[-1].get('internal_id', 0))
 
@@ -230,6 +232,11 @@ class NetSuiteClient:
                 else:
                     # Loop completed without break (no incomplete page)
                     chunk_complete = False
+
+                # If no data in this chunk, we're done
+                if not chunk_has_data:
+                    LOGGER.info("No data found in this chunk - ending sync")
+                    break
 
                 # If we got incomplete page, this was the final chunk
                 if chunk_complete:
