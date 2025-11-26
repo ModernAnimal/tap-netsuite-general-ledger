@@ -49,7 +49,7 @@ class GLDetailStream(BaseStream):
         self,
         min_internal_id: int = 0,
         last_modified_date: str = None,
-        posting_period_id: int = None
+        posting_period_name: str = None
     ) -> str:
         """Build the SuiteQL query to fetch GL data
 
@@ -57,7 +57,8 @@ class GLDetailStream(BaseStream):
             min_internal_id: Minimum internal ID to fetch (for chunking
                 beyond offset limit)
             last_modified_date: Optional date filter for incremental sync
-            posting_period_id: Optional posting period ID to filter by
+            posting_period_name: Optional posting period name to filter by
+                (e.g., "Jan 2025")
 
         Returns:
             SuiteQL query string
@@ -116,8 +117,10 @@ class GLDetailStream(BaseStream):
         """
 
         # Add posting period filter if specified
-        if posting_period_id is not None:
-            query += f" AND t.PostingPeriod = {posting_period_id}"
+        if posting_period_name is not None:
+            query += (
+                f" AND BUILTIN.DF(t.PostingPeriod) = '{posting_period_name}'"
+            )
 
         # Add ID filter if chunking (to handle offset limit)
         if min_internal_id > 0:
@@ -224,13 +227,13 @@ class GLDetailStream(BaseStream):
         if 'bookmarks' not in state:
             state['bookmarks'] = {}
 
-        # Get posting period IDs from config
-        posting_period_ids = self.config.get('posting_period_ids', [])
+        # Get posting period names from config
+        posting_period_names = self.config.get('posting_period_names', [])
         
         # If empty or not provided, do a single sync without period filter
-        if not posting_period_ids:
+        if not posting_period_names:
             LOGGER.info(
-                "No posting_period_ids configured - syncing all periods"
+                "No posting_period_names configured - syncing all periods"
             )
             total_records = self._sync_page_by_page(state, None)
             
@@ -255,8 +258,8 @@ class GLDetailStream(BaseStream):
 
         # Otherwise, loop through each posting period
         LOGGER.info(
-            f"Syncing {len(posting_period_ids)} posting periods: "
-            f"{posting_period_ids}"
+            f"Syncing {len(posting_period_names)} posting periods: "
+            f"{posting_period_names}"
         )
 
         # Get previously completed periods from state
@@ -270,31 +273,32 @@ class GLDetailStream(BaseStream):
         total_records_all_periods = 0
 
         # Process each posting period sequentially
-        for period_id in posting_period_ids:
+        for period_name in posting_period_names:
             # Skip if already completed
-            if period_id in completed_periods:
+            if period_name in completed_periods:
                 LOGGER.info(
-                    f"Posting period {period_id} already completed - skipping"
+                    f"Posting period '{period_name}' already completed - "
+                    f"skipping"
                 )
                 # Add to total from previous run
                 total_records_all_periods += period_stats.get(
-                    str(period_id), {}
+                    period_name, {}
                 ).get('record_count', 0)
                 continue
 
             LOGGER.info(
-                f"Syncing posting period {period_id} "
-                f"({posting_period_ids.index(period_id) + 1}/"
-                f"{len(posting_period_ids)})"
+                f"Syncing posting period '{period_name}' "
+                f"({posting_period_names.index(period_name) + 1}/"
+                f"{len(posting_period_names)})"
             )
 
             # Sync this posting period
             period_start_time = datetime.now(timezone.utc)
-            period_records = self._sync_page_by_page(state, period_id)
+            period_records = self._sync_page_by_page(state, period_name)
             period_end_time = datetime.now(timezone.utc)
 
             # Update per-period stats
-            period_stats[str(period_id)] = {
+            period_stats[period_name] = {
                 'record_count': period_records,
                 'sync_started': period_start_time.isoformat(),
                 'sync_completed': period_end_time.isoformat(),
@@ -304,11 +308,11 @@ class GLDetailStream(BaseStream):
             }
 
             # Mark period as completed
-            completed_periods.add(period_id)
+            completed_periods.add(period_name)
             total_records_all_periods += period_records
 
             LOGGER.info(
-                f"Completed posting period {period_id}: "
+                f"Completed posting period '{period_name}': "
                 f"{period_records} records"
             )
 
@@ -349,7 +353,7 @@ class GLDetailStream(BaseStream):
     def _sync_page_by_page(
         self,
         state: Dict[str, Any],
-        posting_period_id: int = None
+        posting_period_name: str = None
     ) -> Dict[str, Any]:
         """Sync by processing pages as they arrive
 
@@ -358,10 +362,11 @@ class GLDetailStream(BaseStream):
 
         Args:
             state: Current state dict
-            posting_period_id: Optional posting period ID to filter by
+            posting_period_name: Optional posting period name to filter by
+                (e.g., "Jan 2025")
 
         Returns:
-            Updated state dict
+            Total number of records processed (int)
         """
         replication_method = (
             'INCREMENTAL' if self.client.last_modified_date else 'FULL_TABLE'
@@ -377,10 +382,10 @@ class GLDetailStream(BaseStream):
             'replication_method': replication_method,
             'sync_started': start_time.isoformat(),
         }
-        if posting_period_id is not None:
+        if posting_period_name is not None:
             state['bookmarks'][self.tap_stream_id][
                 'current_posting_period'
-            ] = posting_period_id
+            ] = posting_period_name
         if self.client.last_modified_date:
             state['bookmarks'][self.tap_stream_id]['last_modified_date'] = (
                 self.client.last_modified_date
@@ -404,7 +409,7 @@ class GLDetailStream(BaseStream):
                 # Pass query builder to client with posting period
                 def query_builder(min_id, last_mod):
                     return self.build_query(
-                        min_id, last_mod, posting_period_id
+                        min_id, last_mod, posting_period_name
                     )
 
                 async for page in self.client.fetch_gl_data_pages(
@@ -482,10 +487,10 @@ class GLDetailStream(BaseStream):
                         'replication_method': replication_method,
                         'current_page': page_num
                     }
-                    if posting_period_id is not None:
+                    if posting_period_name is not None:
                         state['bookmarks'][self.tap_stream_id][
                             'current_posting_period'
-                        ] = posting_period_id
+                        ] = posting_period_name
                     if self.client.last_modified_date:
                         state['bookmarks'][self.tap_stream_id][
                             'last_modified_date'
