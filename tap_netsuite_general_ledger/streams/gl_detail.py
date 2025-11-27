@@ -48,7 +48,8 @@ class GLDetailStream(BaseStream):
     def build_query(
         self,
         min_internal_id: int = 0,
-        last_modified_date: str = None
+        last_modified_date: str = None,
+        posting_period_name: str = None
     ) -> str:
         """Build the SuiteQL query to fetch GL data
 
@@ -56,6 +57,8 @@ class GLDetailStream(BaseStream):
             min_internal_id: Minimum internal ID to fetch (for chunking
                 beyond offset limit)
             last_modified_date: Optional date filter for incremental sync
+            posting_period_name: Optional posting period name to filter by
+                (e.g., "Jan 2025")
 
         Returns:
             SuiteQL query string
@@ -113,9 +116,15 @@ class GLDetailStream(BaseStream):
             )
         """
 
+        # Add posting period filter if specified
+        if posting_period_name is not None:
+            query += (
+                f" AND BUILTIN.DF(t.PostingPeriod) = '{posting_period_name}'"
+            )
+
         # Add ID filter if chunking (to handle offset limit)
         if min_internal_id > 0:
-            query += f" AND t.ID > {min_internal_id}"
+            query += f" AND t.ID >= {min_internal_id}"
 
         # Add incremental filter if last_modified_date is set
         if last_modified_date:
@@ -188,7 +197,8 @@ class GLDetailStream(BaseStream):
         """Sync GL detail stream with page-level streaming
 
         This uses the existing complex logic for GL detail with chunking
-        and incremental sync support.
+        and incremental sync support. If posting_period_ids are configured,
+        will loop through each period sequentially.
 
         Args:
             catalog_entry: Catalog entry for this stream
@@ -217,10 +227,137 @@ class GLDetailStream(BaseStream):
         if 'bookmarks' not in state:
             state['bookmarks'] = {}
 
-        # Sync using page-level streaming
-        return self._sync_page_by_page(state)
+        # Get posting periods from config
+        posting_periods = self.config.get('posting_periods', [])
 
-    def _sync_page_by_page(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        # If empty or not provided, do a single sync without period filter
+        if not posting_periods:
+            LOGGER.info(
+                "No posting_periods configured - syncing all periods"
+            )
+            total_records = self._sync_page_by_page(state, None)
+
+            # Write final state
+            state['bookmarks'][self.tap_stream_id] = {
+                'last_sync': datetime.now(timezone.utc).isoformat(),
+                'record_count': total_records,
+                'replication_method': (
+                    'INCREMENTAL'
+                    if self.client.last_modified_date
+                    else 'FULL_TABLE'
+                ),
+                'sync_completed': True
+            }
+            if self.client.last_modified_date:
+                state['bookmarks'][self.tap_stream_id][
+                    'last_modified_date'
+                ] = self.client.last_modified_date
+
+            self.write_state(state)
+            return state
+
+        # Otherwise, loop through each posting period
+        LOGGER.info(
+            f"Syncing {len(posting_periods)} posting periods: "
+            f"{posting_periods}"
+        )
+
+        # Get previously completed periods from state
+        stream_state = state['bookmarks'].get(self.tap_stream_id, {})
+        completed_periods = set(
+            stream_state.get('completed_posting_periods', [])
+        )
+
+        # Track per-period stats
+        period_stats = stream_state.get('posting_period_stats', {})
+        total_records_all_periods = 0
+
+        # Process each posting period sequentially
+        for period_name in posting_periods:
+            # Skip if already completed
+            if period_name in completed_periods:
+                LOGGER.info(
+                    f"Posting period '{period_name}' already completed - "
+                    f"skipping"
+                )
+                # Add to total from previous run
+                total_records_all_periods += period_stats.get(
+                    period_name, {}
+                ).get('record_count', 0)
+                continue
+
+            LOGGER.info(
+                f"Syncing posting period '{period_name}' "
+                f"({posting_periods.index(period_name) + 1}/"
+                f"{len(posting_periods)})"
+            )
+
+            # Sync this posting period
+            LOGGER.info(
+                f"Calling _sync_page_by_page with period_name: '{period_name}'"
+            )
+            period_start_time = datetime.now(timezone.utc)
+            period_records = self._sync_page_by_page(state, period_name)
+            period_end_time = datetime.now(timezone.utc)
+
+            # Update per-period stats
+            period_stats[period_name] = {
+                'record_count': period_records,
+                'sync_started': period_start_time.isoformat(),
+                'sync_completed': period_end_time.isoformat(),
+                'duration_seconds': (
+                    period_end_time - period_start_time
+                ).total_seconds()
+            }
+
+            # Mark period as completed
+            completed_periods.add(period_name)
+            total_records_all_periods += period_records
+
+            LOGGER.info(
+                f"Completed posting period '{period_name}': "
+                f"{period_records} records"
+            )
+
+            # Update state after each period for checkpointing
+            state['bookmarks'][self.tap_stream_id] = {
+                'last_sync': datetime.now(timezone.utc).isoformat(),
+                'total_record_count': total_records_all_periods,
+                'completed_posting_periods': sorted(list(completed_periods)),
+                'posting_period_stats': period_stats,
+                'replication_method': (
+                    'INCREMENTAL'
+                    if self.client.last_modified_date
+                    else 'FULL_TABLE'
+                ),
+                'sync_completed': False
+            }
+            if self.client.last_modified_date:
+                state['bookmarks'][self.tap_stream_id][
+                    'last_modified_date'
+                ] = self.client.last_modified_date
+
+            self.write_state(state)
+
+        # Final state update - mark sync as complete
+        state['bookmarks'][self.tap_stream_id]['sync_completed'] = True
+        state['bookmarks'][self.tap_stream_id]['sync_finished'] = (
+            datetime.now(timezone.utc).isoformat()
+        )
+
+        LOGGER.info(
+            f"Completed all posting periods: "
+            f"{total_records_all_periods} total records"
+        )
+
+        self.write_state(state)
+        return state
+
+    def _sync_page_by_page(
+        self,
+        state: Dict[str, Any],
+        posting_period_name: str = None
+    ) -> Dict[str, Any]:
         """Sync by processing pages as they arrive
 
         This is the original page-by-page sync logic for GL detail.
@@ -228,9 +365,11 @@ class GLDetailStream(BaseStream):
 
         Args:
             state: Current state dict
+            posting_period_name: Optional posting period name to filter by
+                (e.g., "Jan 2025")
 
         Returns:
-            Updated state dict
+            Total number of records processed (int)
         """
         replication_method = (
             'INCREMENTAL' if self.client.last_modified_date else 'FULL_TABLE'
@@ -246,6 +385,10 @@ class GLDetailStream(BaseStream):
             'replication_method': replication_method,
             'sync_started': start_time.isoformat(),
         }
+        if posting_period_name is not None:
+            state['bookmarks'][self.tap_stream_id][
+                'current_posting_period'
+            ] = posting_period_name
         if self.client.last_modified_date:
             state['bookmarks'][self.tap_stream_id]['last_modified_date'] = (
                 self.client.last_modified_date
@@ -266,9 +409,19 @@ class GLDetailStream(BaseStream):
                 batch = []
                 batch_size = self.client.record_batch_size
 
-                # Pass query builder to client
+                # Pass query builder to client with posting period
+                def query_builder(min_id, last_mod):
+                    LOGGER.info(
+                        f"query_builder called with min_id={min_id}, "
+                        f"last_mod={last_mod}, "
+                        f"posting_period_name='{posting_period_name}'"
+                    )
+                    return self.build_query(
+                        min_id, last_mod, posting_period_name
+                    )
+
                 async for page in self.client.fetch_gl_data_pages(
-                    self.build_query
+                    query_builder
                 ):
                     page_num += 1
                     page_start_count = total_processed
@@ -342,6 +495,10 @@ class GLDetailStream(BaseStream):
                         'replication_method': replication_method,
                         'current_page': page_num
                     }
+                    if posting_period_name is not None:
+                        state['bookmarks'][self.tap_stream_id][
+                            'current_posting_period'
+                        ] = posting_period_name
                     if self.client.last_modified_date:
                         state['bookmarks'][self.tap_stream_id][
                             'last_modified_date'
@@ -366,18 +523,5 @@ class GLDetailStream(BaseStream):
             f"across {page_num} pages"
         )
 
-        # Final state update
-        state['bookmarks'][self.tap_stream_id] = {
-            'last_sync': datetime.now(timezone.utc).isoformat(),
-            'record_count': total_processed,
-            'replication_method': replication_method,
-            'sync_completed': True
-        }
-        if self.client.last_modified_date:
-            state['bookmarks'][self.tap_stream_id]['last_modified_date'] = (
-                self.client.last_modified_date
-            )
-
-        self.write_state(state)
-
-        return state
+        # Return total processed for aggregation
+        return total_processed

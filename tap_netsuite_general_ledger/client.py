@@ -193,7 +193,7 @@ class NetSuiteClient:
             while True:
                 LOGGER.info(
                     f"Fetching chunk {chunk_num} "
-                    f"(starting from internal ID > {last_internal_id})"
+                    f"(starting from internal ID >= {last_internal_id})"
                 )
 
                 # Build query with ID filter if needed
@@ -203,6 +203,7 @@ class NetSuiteClient:
                 )
 
                 # Fetch pages concurrently within this chunk
+                chunk_has_data = False
                 async for page in self._fetch_chunk_concurrent(
                     query,
                     max_offset
@@ -210,6 +211,7 @@ class NetSuiteClient:
                     if not page:
                         continue
 
+                    chunk_has_data = True
                     total_fetched += len(page)
                     last_internal_id = int(page[-1].get('internal_id', 0))
 
@@ -231,6 +233,11 @@ class NetSuiteClient:
                     # Loop completed without break (no incomplete page)
                     chunk_complete = False
 
+                # If no data in this chunk, we're done
+                if not chunk_has_data:
+                    LOGGER.info("No data found in this chunk - ending sync")
+                    break
+
                 # If we got incomplete page, this was the final chunk
                 if chunk_complete:
                     break
@@ -239,7 +246,7 @@ class NetSuiteClient:
                 chunk_num += 1
                 LOGGER.info(
                     f"Continuing to next chunk "
-                    f"(ID filter: internal_id > {last_internal_id})"
+                    f"(ID filter: internal_id >= {last_internal_id})"
                 )
 
             LOGGER.info(f"Total records fetched: {total_fetched}")
