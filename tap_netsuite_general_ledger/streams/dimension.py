@@ -17,8 +17,43 @@ LOGGER = singer.get_logger()
 DIMENSION_TABLE_CONFIGS = {
     'netsuite_account': {
         'query': """
-            SELECT *
+            SELECT
+                Account.id,
+                Account.category1099Misc,
+                Account.balance,
+                Account.sBankName,
+                Account.sBankRoutingNumber,
+                Account.custrecord_bdc_lastupdatedbyimp_acc,
+                Account.deferralAcct,
+                Account.description,
+                Account.accountSearchDisplayName,
+                Account.displayNameWithHierarchy,
+                Account.eliminate,
+                Account.externalId,
+                Account.fullName,
+                Account.isInactive,
+                Account.includeChildren,
+                Account.inventory,
+                Account.lastModifiedDate,
+                Account.custrecord_legacy_no,
+                CUSTOMRECORD1032.name as revenue_classification,
+                Account.accountSearchDisplayNameCopy,
+                Account.acctNumber,
+                Account.class,
+                Account.department,
+                Account.location,
+                Account.revalue,
+                Account.custrecord_fam_account_showinfixedasset,
+                Account.sSpecAcct,
+                Account.parent,
+                Account.subsidiary,
+                Account.isSummary,
+                Account.billableExpensesAcct,
+                Account.acctType,
+                Account.reconcileWithMatching
             FROM Account
+            LEFT JOIN CUSTOMRECORD1032
+                on Account.custrecord6 = CUSTOMRECORD1032.id
             ORDER BY Account.id
         """,
         'key_properties': ['id']

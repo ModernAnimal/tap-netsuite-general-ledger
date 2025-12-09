@@ -105,6 +105,10 @@
       "type": ["null", "string"],
       "description": "Revalue flag"
     },
+    "revenue_classification": {
+      "type": ["null", "string"],
+      "description": "Revenue classification"
+    },
     "subsidiary": {
       "type": ["null", "string"],
       "description": "Subsidiary"
