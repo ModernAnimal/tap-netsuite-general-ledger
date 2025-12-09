@@ -5,9 +5,13 @@
       "type": ["null", "integer"],
       "description": "Account ID"
     },
-    "acctname": {
+    "accountsearchdisplayname": {
       "type": ["null", "string"],
-      "description": "Account name"
+      "description": "Account search display name"
+    },
+    "accountsearchdisplaynamecopy": {
+      "type": ["null", "string"],
+      "description": "Account search display name copy"
     },
     "acctnumber": {
       "type": ["null", "string"],
@@ -21,17 +25,41 @@
       "type": ["null", "number"],
       "description": "Account balance"
     },
-    "cashflowrate": {
-      "type": ["null", "string"],
-      "description": "Cash flow rate"
+    "billableexpensesacct": {
+      "type": ["null", "integer"],
+      "description": "Billable expenses account"
     },
     "category1099misc": {
       "type": ["null", "string"],
       "description": "1099 MISC category"
     },
+    "class": {
+      "type": ["null", "integer"],
+      "description": "Class"
+    },
     "currency": {
-      "type": ["null", "string"],
+      "type": ["null", "integer"],
       "description": "Currency"
+    },
+    "custrecord_bdc_lastupdatedbyimp_acc": {
+      "type": ["null", "string"],
+      "description": "BDC last updated by import - account"
+    },
+    "custrecord_fam_account_showinfixedasset": {
+      "type": ["null", "string"],
+      "description": "FAM account show in fixed asset"
+    },
+    "custrecord_legacy_no": {
+      "type": ["null", "string"],
+      "description": "Legacy number"
+    },
+    "deferralacct": {
+      "type": ["null", "integer"],
+      "description": "Deferral account"
+    },
+    "department": {
+      "type": ["null", "integer"],
+      "description": "Department"
     },
     "description": {
       "type": ["null", "string"],
@@ -89,12 +117,16 @@
       "type": ["null", "string"],
       "description": "Localizations"
     },
+    "location": {
+      "type": ["null", "integer"],
+      "description": "Location"
+    },
     "openbalance": {
       "type": ["null", "string"],
       "description": "Opening balance"
     },
     "parent": {
-      "type": ["null", "string"],
+      "type": ["null", "integer"],
       "description": "Parent account"
     },
     "reconcilewithmatching": {
@@ -109,8 +141,20 @@
       "type": ["null", "string"],
       "description": "Revenue classification"
     },
-    "subsidiary": {
+    "sbankname": {
       "type": ["null", "string"],
+      "description": "Bank name"
+    },
+    "sbankreoutingnumber": {
+      "type": ["null", "string"],
+      "description": "Bank routing number"
+    },
+    "sspecacct": {
+      "type": ["null", "string"],
+      "description": "Special account"
+    },
+    "subsidiary": {
+      "type": ["null", "integer"],
       "description": "Subsidiary"
     }
   }
