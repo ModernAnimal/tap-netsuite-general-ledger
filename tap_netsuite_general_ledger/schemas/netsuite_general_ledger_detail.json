@@ -76,6 +76,13 @@
       "type": "integer",
       "description": "Internal ID of the transaction"
     },
+    "entity_id": {
+      "type": [
+        "null",
+        "integer"
+      ],
+      "description": "Entity ID"
+    },
     "entity_name": {
       "type": [
         "null",
