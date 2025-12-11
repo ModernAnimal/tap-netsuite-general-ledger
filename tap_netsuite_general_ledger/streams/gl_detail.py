@@ -21,7 +21,7 @@ class GLDetailStream(BaseStream):
     INT_FIELDS = frozenset({
         'internal_id', 'acct_id', 'posting_period_id',
         'trans_acct_line_id', 'account_group', 'department', 'class',
-        'location'
+        'location', 'entity_id'
     })
 
     FLOAT_FIELDS = frozenset({'debit', 'credit', 'net_amount'})
@@ -31,9 +31,9 @@ class GLDetailStream(BaseStream):
         'trans_acct_line_last_modified', 'transaction_last_modified',
         'account_last_modified', 'posting', 'approval',
         'transaction_date', 'transaction_id', 'trans_acct_line_id',
-        'internal_id', 'entity_name', 'trans_memo', 'trans_line_memo',
-        'transaction_type', 'acct_id', 'account_group', 'department',
-        'class', 'location', 'debit', 'credit', 'net_amount',
+        'internal_id', 'entity_id', 'entity_name', 'trans_memo',
+        'trans_line_memo', 'transaction_type', 'acct_id', 'account_group',
+        'department', 'class', 'location', 'debit', 'credit', 'net_amount',
         'subsidiary', 'document_number', 'status'
     })
 
@@ -80,6 +80,7 @@ class GLDetailStream(BaseStream):
             a.lastmodifieddate AS account_last_modified,
             t.Posting AS posting,
             BUILTIN.DF(t.approvalStatus) AS approval,
+            t.Entity as entity_id,
             BUILTIN.DF(t.Entity) AS entity_name,
             t.memo AS trans_memo,
             tl.memo AS trans_line_memo,
@@ -114,6 +115,7 @@ class GLDetailStream(BaseStream):
                 ( tal.Debit IS NOT NULL )
                 OR ( tal.Credit IS NOT NULL )
             )
+            AND a.acctNumber = 27000
         """
 
         # Add posting period filter if specified
