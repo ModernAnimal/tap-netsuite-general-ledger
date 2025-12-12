@@ -76,19 +76,33 @@
       "type": "integer",
       "description": "Internal ID of the transaction"
     },
-    "entity_id": {
+    "transaction_entity_id": {
       "type": [
         "null",
         "integer"
       ],
-      "description": "Entity ID"
+      "description": "Transaction-level entity ID"
     },
-    "entity_name": {
+    "transaction_entity_name": {
       "type": [
         "null",
         "string"
       ],
-      "description": "Entity name"
+      "description": "Transaction-level entity name"
+    },
+    "transaction_line_entity_id": {
+      "type": [
+        "null",
+        "integer"
+      ],
+      "description": "Transaction line-level entity ID"
+    },
+    "transaction_line_entity_name": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "Transaction line-level entity name"
     },
     "trans_memo": {
       "type": [

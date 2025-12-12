@@ -21,7 +21,7 @@ class GLDetailStream(BaseStream):
     INT_FIELDS = frozenset({
         'internal_id', 'acct_id', 'posting_period_id',
         'trans_acct_line_id', 'account_group', 'department', 'class',
-        'location', 'entity_id'
+        'location', 'transaction_entity_id', 'transaction_line_entity_id'
     })
 
     FLOAT_FIELDS = frozenset({'debit', 'credit', 'net_amount'})
@@ -31,10 +31,11 @@ class GLDetailStream(BaseStream):
         'trans_acct_line_last_modified', 'transaction_last_modified',
         'account_last_modified', 'posting', 'approval',
         'transaction_date', 'transaction_id', 'trans_acct_line_id',
-        'internal_id', 'entity_id', 'entity_name', 'trans_memo',
-        'trans_line_memo', 'transaction_type', 'acct_id', 'account_group',
-        'department', 'class', 'location', 'debit', 'credit', 'net_amount',
-        'subsidiary', 'document_number', 'status'
+        'internal_id', 'transaction_entity_id', 'transaction_entity_name',
+        'transaction_line_entity_id', 'transaction_line_entity_name',
+        'trans_memo', 'trans_line_memo', 'transaction_type', 'acct_id',
+        'account_group', 'department', 'class', 'location', 'debit', 'credit',
+        'net_amount', 'subsidiary', 'document_number', 'status'
     })
 
     def get_stream_id(self) -> str:
@@ -80,8 +81,10 @@ class GLDetailStream(BaseStream):
             a.lastmodifieddate AS account_last_modified,
             t.Posting AS posting,
             BUILTIN.DF(t.approvalStatus) AS approval,
-            t.Entity as entity_id,
-            BUILTIN.DF(t.Entity) AS entity_name,
+            t.entity as transaction_entity_id,
+            BUILTIN.DF(t.entity) AS transaction_entity_name,
+            tl.entity as transaction_line_entity_id,
+            BUILTIN.DF(tl.entity) AS transaction_line_entity_name,
             t.memo AS trans_memo,
             tl.memo AS trans_line_memo,
             BUILTIN.DF(t.Type) AS transaction_type,
