@@ -118,7 +118,6 @@ class GLDetailStream(BaseStream):
                 ( tal.Debit IS NOT NULL )
                 OR ( tal.Credit IS NOT NULL )
             )
-            AND a.id = 252
         """
 
         # Add posting period filter if specified
