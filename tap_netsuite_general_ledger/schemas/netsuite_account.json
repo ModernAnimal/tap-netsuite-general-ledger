@@ -145,7 +145,7 @@
       "type": ["null", "string"],
       "description": "Bank name"
     },
-    "sbankreoutingnumber": {
+    "sbankroutingnumber": {
       "type": ["null", "string"],
       "description": "Bank routing number"
     },
@@ -156,6 +156,14 @@
     "subsidiary": {
       "type": ["null", "integer"],
       "description": "Subsidiary"
+    },
+    "custrecord6": {
+      "type": ["null", "integer"],
+      "description": "Custom record 6 ID"
+    },
+    "category": {
+      "type": ["null", "string"],
+      "description": "Category name (display field for custrecord6)"
     }
   }
 }

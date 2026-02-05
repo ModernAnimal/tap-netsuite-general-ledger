@@ -100,6 +100,14 @@
     "attention": {
       "type": ["null", "string"],
       "description": "Attention/Contact name"
+    },
+    "mid_name": {
+      "type": ["null", "string"],
+      "description": "MID name"
+    },
+    "ukg_location": {
+      "type": ["null", "string"],
+      "description": "UKG location"
     }
   }
 }
