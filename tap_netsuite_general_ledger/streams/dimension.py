@@ -36,7 +36,6 @@ DIMENSION_TABLE_CONFIGS = {
                 Account.inventory,
                 Account.lastModifiedDate,
                 Account.custrecord_legacy_no,
-                CUSTOMRECORD1032.name as revenue_classification,
                 Account.accountSearchDisplayNameCopy,
                 Account.acctNumber,
                 Account.class,
@@ -50,10 +49,10 @@ DIMENSION_TABLE_CONFIGS = {
                 Account.isSummary,
                 Account.billableExpensesAcct,
                 Account.acctType,
-                Account.reconcileWithMatching
+                Account.reconcileWithMatching,
+                Account.custrecord6,
+                BUILTIN.DF(Account.custrecord6) as category
             FROM Account
-            LEFT JOIN CUSTOMRECORD1032
-                on Account.custrecord6 = CUSTOMRECORD1032.id
             ORDER BY Account.id
         """,
         'key_properties': ['id']
@@ -125,7 +124,9 @@ DIMENSION_TABLE_CONFIGS = {
                 a.zip,
                 a.country,
                 a.addrphone,
-                a.attention
+                a.attention,
+                l.custrecord7 as mid_name,
+                l.custrecord8 as ukg_location,
             FROM Location l
             LEFT JOIN LocationMainAddress a ON l.mainaddress = a.nkey
             ORDER BY l.id
@@ -198,7 +199,12 @@ class DimensionStream(BaseStream):
             'id', 'parent', 'currency', 'subsidiary', 'expenseaccount',
             'payablesaccount', 'terms', 'incoterm',
             'representingsubsidiary', 'custentity_2663_payment_method',
-            'mainaddress', 'locationtype', 'cseg1'
+            'mainaddress', 'locationtype', 'cseg1',
+            # Account integer fields
+            'billableexpensesacct', 'class', 'deferralacct', 'department',
+            'location', 'custrecord6',
+            # Vendor integer fields
+            'workcalendar'
         }
 
         # Numeric fields that should be converted to float
