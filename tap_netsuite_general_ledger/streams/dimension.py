@@ -127,6 +127,9 @@ DIMENSION_TABLE_CONFIGS = {
                 a.attention,
                 l.custrecord7 as mid_name,
                 l.custrecord8 as ukg_location,
+                l.custrecord9 as idexx_account,
+                l.custrecord10 as zoetis_id,
+                l.custrecord11 as vetcove_id
             FROM Location l
             LEFT JOIN LocationMainAddress a ON l.mainaddress = a.nkey
             ORDER BY l.id
@@ -204,7 +207,9 @@ class DimensionStream(BaseStream):
             'billableexpensesacct', 'class', 'deferralacct', 'department',
             'location', 'custrecord6',
             # Vendor integer fields
-            'workcalendar'
+            'workcalendar',
+            # Location integer fields
+            'idexx_account', 'zoetis_id', 'vetcove_id'
         }
 
         # Numeric fields that should be converted to float

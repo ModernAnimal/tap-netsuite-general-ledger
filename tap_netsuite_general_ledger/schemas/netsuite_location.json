@@ -108,6 +108,18 @@
     "ukg_location": {
       "type": ["null", "string"],
       "description": "UKG location"
+    },
+    "idexx_account": {
+      "type": ["null", "integer"],
+      "description": "IDEXX account ID"
+    },
+    "zoetis_id": {
+      "type": ["null", "integer"],
+      "description": "Zoetis ID"
+    },
+    "vetcove_id": {
+      "type": ["null", "integer"],
+      "description": "Vetcove ID"
     }
   }
 }
