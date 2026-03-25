@@ -35,7 +35,7 @@ class GLDetailStream(BaseStream):
         'transaction_line_entity_id', 'transaction_line_entity_name',
         'trans_memo', 'trans_line_memo', 'transaction_type', 'acct_id',
         'account_group', 'department', 'class', 'location', 'debit', 'credit',
-        'net_amount', 'subsidiary', 'document_number', 'status'
+        'net_amount', 'subsidiary', 'document_number', 'status', 'journal_name'
     })
 
     def get_stream_id(self) -> str:
@@ -98,7 +98,8 @@ class GLDetailStream(BaseStream):
             tal.Amount AS net_amount,
             BUILTIN.DF(tl.Subsidiary) AS subsidiary,
             t.Number AS document_number,
-            BUILTIN.DF(t.Status) AS status
+            BUILTIN.DF(t.Status) AS status,
+            t.custbody_journal_no as journal_name
         FROM
             Transaction t
         INNER JOIN TransactionAccountingLine tal ON (

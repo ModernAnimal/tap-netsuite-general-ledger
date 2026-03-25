@@ -201,6 +201,13 @@
         "string"
       ],
       "description": "Transaction status"
+    },
+    "journal_name": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "Journal name from custom field"
     }
   }
 }
